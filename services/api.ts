@@ -1,0 +1,44 @@
+const BASE_URL = "http://192.168.100.108/api";
+
+export const sendReport = async (report: {
+  emergency_type: string;
+  accident_type: string;
+  reporter_name: string;
+  latitude: number;
+  longitude: number;
+  user_id?: number;
+  image?: string | null;
+}) => {
+  const formData = new FormData();
+  formData.append("accident_level", report.emergency_type);
+  formData.append("accident_type", report.accident_type);
+  formData.append("reporter_name", report.reporter_name);
+  formData.append("latitude", report.latitude.toString());
+  formData.append("longitude", report.longitude.toString());
+
+  if (report.user_id) {
+    formData.append("user_id", report.user_id.toString());
+  }
+
+  if (report.image) {
+    const filename = report.image.split("/").pop() || "photo.mov";
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+    formData.append("image", {
+      uri: report.image,
+      name: filename,
+      type: type,
+    } as any);
+  }
+
+  const res = await fetch(`${BASE_URL}/reports.php`, {
+    method: "POST",
+    body: formData,
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  return res.json();
+};
