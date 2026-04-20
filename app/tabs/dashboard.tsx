@@ -1,8 +1,9 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../(auth)/auth";
@@ -56,22 +57,16 @@ export default function Dashboard() {
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 10 }}
         >
           {/* --- HEADER --- */}
-          <View className="bg-primary h-16 flex-row items-center justify-between px-4">
-            <Image
-              source={require("../../assets/images/ambulance.png")}
-              style={{ width: 40, height: 40 }}
-              resizeMode="contain"
-            />
+          <View className=" h-16 flex-row items-center justify-between px-4">
+            <FontAwesome5 name="ambulance" size={24} color="black" />
 
             <View>
-              <Text className="text-2xl font-bold text-center">Dashboard</Text>
+              <Text className="text-2xl font-bold text-center text-black">
+                Dashboard
+              </Text>
             </View>
 
             <View className="flex-row items-center gap-4">
-              <Pressable>
-                <MaterialIcons name="notifications" size={28} color="black" />
-              </Pressable>
-
               <Pressable onPress={handleLogout}>
                 <MaterialIcons name="logout" size={28} color="black" />
               </Pressable>

@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import Toast from "react-native-toast-message";
-
 import { useAuth } from "../(auth)/auth";
+
 export default function TabLayout() {
   const { isLoggedIn } = useAuth();
   console.log("User logged in?", isLoggedIn);

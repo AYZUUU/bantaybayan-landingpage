@@ -69,10 +69,10 @@ export default function LoginScreen() {
   return (
     <LinearGradient colors={["#ffffff", "#4D8BE2"]} style={{ flex: 1 }}>
       <SafeAreaView
-        className="items-center flex-1"
-        edges={["bottom", "left", "right"]}
+        className="items-center flex-1 justify-center mb-10"
+        edges={["top", "left", "right"]}
       >
-        <View className="h-auto bg-primary rounded-3xl shadow-lg w-10/12 mt-10 mb-10 p-6">
+        <View className="h-auto bg-primary rounded-3xl shadow-lg w-10/12 p-6">
           <Text
             style={{
               color: "#2A4C7C",
