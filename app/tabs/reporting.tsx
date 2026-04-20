@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { sendReport } from "../../services/api";
 import { pickSource } from "../_utils/imagecapture";
+import LocationPopup from "../_utils/Popup";
 import WarningPulse from "../_utils/warningpulse";
 
 type MyLoc = { latitude: number; longitude: number } | null;
@@ -20,6 +21,8 @@ export default function Reporting() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [location, setLocation] = useState<MyLoc>(null);
   const [loading, setLoading] = useState(false);
+
+  const [popupVisible, setPopupVisible] = useState(false);
 
   const emergencyTypes = [
     { id: "medical", label: "Medical Emergency" },
@@ -75,7 +78,9 @@ export default function Reporting() {
         text1: "Report Sent",
         text2: "Community alerted.",
       });
+
       setPhoto(null);
+      setPopupVisible(true);
     } catch (error: any) {
       console.error(
         "Detailed Report Error:",
@@ -99,6 +104,8 @@ export default function Reporting() {
         longitude: location.longitude,
       });
       Toast.show({ type: "success", text1: "Emergency Sent!" });
+
+      setPopupVisible(true);
     } catch (e: any) {
       console.error("Quick Alert Error:", e.response?.data || e.message || e);
       Toast.show({ type: "error", text1: "Quick Alert Failed" });
@@ -107,6 +114,15 @@ export default function Reporting() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
+      <LocationPopup
+        visible={popupVisible}
+        onClose={() => setPopupVisible(false)}
+        address={
+          location
+            ? `Lat: ${location.latitude.toFixed(4)}, Lon: ${location.longitude.toFixed(4)}`
+            : "Fetching GPS..."
+        }
+      />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="items-center mt-10">
           <Pressable onPress={handleQuickReport}>
