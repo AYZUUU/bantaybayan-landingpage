@@ -4,29 +4,46 @@ import Toast from "react-native-toast-message";
 import { useAuth } from "../(auth)/auth";
 
 export default function TabLayout() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, userRole } = useAuth();
   console.log("User logged in?", isLoggedIn);
+
+
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: "#4D8BE2" }}>
       <Tabs.Screen
         name="reporting"
         options={{
           title: "Report",
-
+          tabBarItemStyle: {
+            display: isLoggedIn && userRole === "rescuer" ? "flex" : "none",
+          },
           tabBarIcon: ({ color }) => (
             <Ionicons name="megaphone" size={24} color={color} />
           ),
         }}
       />
+
+      
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Dashboard",
           headerShown: false,
-          tabBarItemStyle: { display: isLoggedIn ? "flex" : "none" },
+          tabBarItemStyle: {
+            display: isLoggedIn && userRole === "rescuer" ? "flex" : "none",
+          },
           tabBarIcon: ({ color }) => (
             <Ionicons name="home" size={28} color={color} />
           ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="rescuer"
+        options={{
+          title: "Rescuer",
+          headerShown: true,
+          
         }}
       />
       <Toast />

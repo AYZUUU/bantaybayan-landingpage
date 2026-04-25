@@ -3,21 +3,23 @@ import React, { createContext, ReactNode, useContext, useState } from "react";
 interface AuthContextType {
   isLoggedIn: boolean;
   setIsLoggedIn: (value: boolean) => void;
+  userRole: string | null;
+  setUserRole: (role: string | null ) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedInState] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
-  // Wrap the state setter to see if it's being called
   const setIsLoggedIn = (value: boolean) => {
     console.log("Context is updating isLoggedIn to:", value);
     setIsLoggedInState(value);
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn }}>
+    <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn, userRole, setUserRole }}>
       {children}
     </AuthContext.Provider>
   );

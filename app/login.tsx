@@ -17,7 +17,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { setIsLoggedIn } = useAuth();
+  const { setIsLoggedIn, setUserRole } = useAuth();
   const handleLogin = async () => {
     if (!email || !password) {
       Toast.show({
@@ -41,13 +41,20 @@ export default function LoginScreen() {
 
       if (result.status === "success") {
         setIsLoggedIn(true);
+        setUserRole(result.role);
         Toast.show({
           type: "success",
           text1: "Welcome back!",
           text2: "Logging you into BantayBayan...",
         });
 
-        setTimeout(() => router.replace("/tabs/dashboard"), 1500);
+        setTimeout(() => {
+          if (result.role === "rescuer") {
+            router.replace("/tabs/rescuer");
+          } else if (result.role === "citizen") {
+            router.replace("/tabs/dashboard");
+          }
+        }, 2000);
       } else {
         Toast.show({
           type: "error",
