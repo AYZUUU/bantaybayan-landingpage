@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 
-export const pickSource = async (setPhoto) => {
+export const pickSource = async (setPhoto: (uri: string) => void) => {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
 
   if (!permission.granted) {

@@ -7,7 +7,6 @@ export default function TabLayout() {
   const { isLoggedIn, userRole } = useAuth();
   console.log("User logged in?", isLoggedIn);
 
-
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: "#4D8BE2" }}>
       <Tabs.Screen
@@ -15,7 +14,7 @@ export default function TabLayout() {
         options={{
           title: "Report",
           tabBarItemStyle: {
-            display: isLoggedIn && userRole === "rescuer" ? "flex" : "none",
+            display: isLoggedIn && userRole !== "rescuer" ? "flex" : "none",
           },
           tabBarIcon: ({ color }) => (
             <Ionicons name="megaphone" size={24} color={color} />
@@ -23,14 +22,13 @@ export default function TabLayout() {
         }}
       />
 
-      
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Dashboard",
           headerShown: false,
           tabBarItemStyle: {
-            display: isLoggedIn && userRole === "rescuer" ? "flex" : "none",
+            display: isLoggedIn && userRole !== "rescuer" ? "flex" : "none",
           },
           tabBarIcon: ({ color }) => (
             <Ionicons name="home" size={28} color={color} />
@@ -42,8 +40,10 @@ export default function TabLayout() {
         name="rescuer"
         options={{
           title: "Rescuer",
-          headerShown: true,
-          
+          headerShown: false,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="medkit" size={28} color={color} />
+          ),
         }}
       />
       <Toast />

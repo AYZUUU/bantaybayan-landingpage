@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -13,17 +13,6 @@ import WarningPulse from "../_utils/warningpulse";
 export default function Dashboard() {
   const router = useRouter();
   const { isLoggedIn, setIsLoggedIn } = useAuth();
-
-  useEffect(() => {
-    if (isLoggedIn === false) {
-      Toast.show({
-        type: "error",
-        text1: "Unauthorized",
-        text2: "Please log in to access the dashboard.",
-      });
-      router.replace("/");
-    }
-  }, [isLoggedIn]);
 
   const handleLogout = async () => {
     try {
