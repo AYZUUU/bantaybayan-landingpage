@@ -61,7 +61,6 @@ export default function Dashboard() {
               </Pressable>
             </View>
           </View>
-          {/* --- HEADER --- */}
 
           <View className="items-center pt-8 px-4">
             <View className="mb-8">
