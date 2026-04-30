@@ -52,7 +52,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink
-          to="/personnel"
+          to="/Personnel"
           className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
         >
           <LuUsers size={20} />
