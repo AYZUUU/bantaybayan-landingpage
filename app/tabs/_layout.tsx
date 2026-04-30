@@ -41,6 +41,9 @@ export default function TabLayout() {
         options={{
           title: "Rescuer",
           headerShown: false,
+          tabBarItemStyle: {
+            display: isLoggedIn && userRole === "rescuer" ? "flex" : "none",
+          },
           tabBarIcon: ({ color }) => (
             <Ionicons name="medkit" size={28} color={color} />
           ),

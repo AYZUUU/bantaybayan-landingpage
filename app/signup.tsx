@@ -54,7 +54,7 @@ export default function Signup() {
         type: `image/${fileType}`,
       } as any);
 
-      const response = await fetch("http://192.168.100.108//api/signup.php", {
+      const response = await fetch("http://192.168.100.108/api/signup.php", {
         method: "POST",
         body: formData,
         signal: controller.signal,

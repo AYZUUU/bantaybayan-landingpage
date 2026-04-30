@@ -2,17 +2,41 @@ import { MaterialIcons } from "@expo/vector-icons";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../(auth)/auth";
-import Card from "../_utils/card";
+
+import Card, { Report } from "../_utils/card";
 import WarningPulse from "../_utils/warningpulse";
 
 export default function Dashboard() {
   const router = useRouter();
   const { isLoggedIn, setIsLoggedIn } = useAuth();
+
+  const [myReports, setMyReports] = useState<Report[]>([]);
+
+  const fetchMyReports = async () => {
+    try {
+      const response = await fetch("http://192.168.100.108/api/getReports.php");
+      const jsonResponse = await response.json();
+
+      const reportsArray = jsonResponse.data;
+
+      if (reportsArray && reportsArray.length > 0) {
+        setMyReports(reportsArray);
+      }
+    } catch (error) {
+      console.error("Fetch Error:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchMyReports();
+    }
+  }, [isLoggedIn]);
 
   const handleLogout = async () => {
     try {
@@ -63,12 +87,10 @@ export default function Dashboard() {
           </View>
 
           <View className="items-center pt-8 px-4">
-            <View className="mb-8">
-              <WarningPulse />
-            </View>
+           
 
             <View className="w-full items-center">
-              <Card />
+              <Card userReports={myReports} />
             </View>
           </View>
         </ScrollView>

@@ -9,6 +9,20 @@ import {
   View,
 } from "react-native";
 
+
+export interface Report {
+  id: string;
+  accident_type: string;
+  accident_level: string;
+  status: string;
+  created_at: string;
+}
+
+
+interface CardProps {
+  userReports: Report[];
+}
+
 if (
   Platform.OS === "android" &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -16,7 +30,8 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function Card() {
+
+export default function Card({ userReports }: CardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleCard = () => {
@@ -26,7 +41,7 @@ export default function Card() {
 
   return (
     <Pressable
-      className="bg-white rounded-xl p-10 m-2 shadow-md"
+      className="bg-white rounded-xl p-8 m-2 shadow-md"
       onPress={toggleCard}
     >
       <Text className="text-lg font-bold">Your Reports</Text>
@@ -34,15 +49,26 @@ export default function Card() {
 
       {isExpanded && (
         <View className="mt-4 pt-4 border-t border-gray-200">
-          <Text className="text-gray-600 mb-2">
-            • Suspicious activity on 5th Ave
-          </Text>
-          <Text className="text-gray-600 mb-2">
-            • Noise complaint at Building B
-          </Text>
-          <Text className="text-gray-600">
-            • Stray dog reported near the park
-          </Text>
+          
+        
+          {userReports && userReports.length > 0 ? (
+            userReports.map((report) => (
+              <View key={report.id} className="mb-3">
+                <Text className="text-gray-800 font-bold">
+                  • {report.accident_type}
+                </Text>
+                <Text className="text-gray-500 ml-3 text-sm">
+                  Status: {report.status} | Time: {report.created_at}
+                </Text>
+              </View>
+            ))
+          ) : (
+           
+            <Text className="text-gray-500 italic text-center py-2">
+              You haven't submitted any reports yet.
+            </Text>
+          )}
+
         </View>
       )}
 
