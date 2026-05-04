@@ -5,11 +5,10 @@ import "./sidebar.css";
 import {
   LuChrome,
   LuLogOut,
-  LuMap,
   LuMenu,
   LuSettings,
   LuTriangle,
-  LuUsers,
+  LuUsers
 } from "react-icons/lu";
 
 export default function Sidebar() {
@@ -41,14 +40,6 @@ export default function Sidebar() {
         >
           <LuTriangle size={20} />
           {isOpen && <span>Incidents</span>}
-        </NavLink>
-
-        <NavLink
-          to="/live-map"
-          className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-        >
-          <LuMap size={20} />
-          {isOpen && <span>Live Map</span>}
         </NavLink>
 
         <NavLink

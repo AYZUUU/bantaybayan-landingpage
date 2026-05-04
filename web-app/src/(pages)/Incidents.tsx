@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast"; // <-- 1. Import toast
+import toast from "react-hot-toast";
+import { 
+  APIProvider, 
+  Map, 
+  AdvancedMarker 
+} from '@vis.gl/react-google-maps';
 import "./dashboard.css";
 
 interface Report {
@@ -17,6 +22,7 @@ interface Report {
 export default function AdminDashboard() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const fetchReports = async () => {
     try {
@@ -119,14 +125,13 @@ export default function AdminDashboard() {
                   )}
                 </td>
                 <td>
-                  <a
-                    href={`https://maps.google.com/?q=${report.latitude},${report.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="map-link"
-                  >
+                  <button className="view-map-btn"
+                  onClick={() => setSelectedLocation({
+                    lat: parseFloat(report.latitude.toString()),
+                    lng: parseFloat(report.longitude.toString())
+                  })}>
                     View Map
-                  </a>
+                  </button>
                 </td>
                 <td>
           
@@ -145,6 +150,28 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+      {selectedLocation && (
+        <div className="map-modal-overlay" onClick={() => setSelectedLocation(null)}>
+          <div className="map-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="close-modal-btn" onClick={() => setSelectedLocation(null)}>
+              &times;
+            </button>
+            <h3 style={{ marginBottom: '15px' }}>Incident Location</h3>
+            
+            <div className="map-container" style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden' }}>
+              <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+                <Map
+                  defaultCenter={selectedLocation}
+                  defaultZoom={16}
+                  mapId="BANTAYBAYAN_MODAL_MAP"
+                >
+                  <AdvancedMarker position={selectedLocation} />
+                </Map>
+              </APIProvider>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -80,7 +80,6 @@ td {
   color: #0f172a;
 }
 
-
 .badge {
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
@@ -88,7 +87,6 @@ td {
   font-weight: 700;
   text-transform: uppercase;
 }
-
 
 .badge.high {
   background-color: #fee2e2;
@@ -124,7 +122,6 @@ td {
   text-decoration: underline;
 }
 
-
 .status-select {
   padding: 0.4rem;
   border-radius: 6px;
@@ -138,4 +135,71 @@ td {
 .status-select:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.view-map-btn {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.view-map-btn:hover {
+  background-color: #1d4ed8;
+}
+
+.map-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.map-modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  position: relative;
+  animation: modalPopIn 0.3s ease-out;
+}
+
+.close-modal-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-modal-btn:hover {
+  color: #ef4444;
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

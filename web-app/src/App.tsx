@@ -6,6 +6,8 @@ import Personnel from "./(pages)/Personnel";
 import AdminLayout from "./components/AdminLayout";
 import AdminLogin from "./components/Login";
 
+import Dashboard from "./(pages)/dashboard";
+
 export default function App() {
   return (
     <>
@@ -16,6 +18,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route path="/incidents" element={<Incidents />} />
           <Route path="/personnel" element={<Personnel />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />
