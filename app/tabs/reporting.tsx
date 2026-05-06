@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
+import { Ionicons } from "@expo/vector-icons";
+
 import { sendReport } from "../../services/api";
 import { pickSource } from "../_utils/imagecapture";
 import LocationPopup from "../_utils/Popup";
@@ -22,34 +24,55 @@ export default function Reporting() {
   const [location, setLocation] = useState<MyLoc>(null);
   const [loading, setLoading] = useState(false);
 
-  const [popupVisible, setPopupVisible] = useState(false);
+
+  const [popupVisible, setPopupVisible] = useState(false); 
+  const [isMapVisible, setIsMapVisible] = useState(false); 
 
   const emergencyTypes = [
-    { id: "medical", label: "Medical Emergency" },
-    { id: "fire", label: "Fire" },
-    { id: "accident", label: "Accident" },
-    { id: "crime", label: "Crime" },
+    { id: "Medical", label: "Medical Emergency" },
+    { id: "Fire", label: "Fire" },
+    { id: "Accident", label: "Accident" },
+    { id: "Crime", label: "Crime" },
   ];
 
-  const [selectedType, setSelectedType] = useState("medical");
-  const [reporterName, setReporterName] = useState("Anonymous User");
+  const [selectedType, setSelectedType] = useState("Medical");
+  const [reporterName, setReporterName] = useState("");
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Toast.show({
-          type: "error",
-          text1: "Permission Denied",
-          text2: "Location is required for BantayBayan.",
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Toast.show({
+            type: "error",
+            text1: "Permission Denied",
+            text2: "Location is required for BantayBayan.",
+          });
+          return;
+        }
+
+    
+        let lastKnown = await Location.getLastKnownPositionAsync({});
+        if (lastKnown) {
+          setLocation({
+            latitude: lastKnown.coords.latitude,
+            longitude: lastKnown.coords.longitude,
+          });
+        }
+
+      
+        let loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
         });
-        return;
+        
+        setLocation({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+
+      } catch (error) {
+        console.error("GPS Fetch Error:", error);
       }
-      let loc = await Location.getCurrentPositionAsync({});
-      setLocation({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
     })();
   }, []);
 
@@ -114,15 +137,30 @@ export default function Reporting() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
+      
+  
+      <LocationPopup
+        visible={isMapVisible}
+        onClose={() => setIsMapVisible(false)}
+        address={location ? `Lat: ${location.latitude.toFixed(4)}, Lon: ${location.longitude.toFixed(4)}` : "Fetching GPS..."}
+        location={location}
+        onLocationChange={setLocation} 
+        isDraggable={true}
+        title="Pinpoint Location"
+        buttonText="Confirm Location"
+      />
+
+   
       <LocationPopup
         visible={popupVisible}
         onClose={() => setPopupVisible(false)}
-        address={
-          location
-            ? `Lat: ${location.latitude.toFixed(4)}, Lon: ${location.longitude.toFixed(4)}`
-            : "Fetching GPS..."
-        }
+        address={location ? `Lat: ${location.latitude.toFixed(4)}, Lon: ${location.longitude.toFixed(4)}` : "Fetching GPS..."}
+        location={location}
+        isDraggable={false} 
+        title="Emergency Sent!"
+        buttonText="Return to Dashboard"
       />
+
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="items-center mt-10">
           <Pressable onPress={handleQuickReport}>
@@ -135,6 +173,39 @@ export default function Reporting() {
             Report Incident
           </Text>
         </View>
+
+     
+        <Pressable
+          onPress={() => setIsMapVisible(true)}
+          style={{
+            backgroundColor: '#eff6ff', 
+            width: '83.3%', 
+            alignSelf: 'center',
+            padding: 16,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: '#bfdbfe', 
+            marginTop: 24,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
+          }}
+        >
+          <View>
+            <Text style={{ color: '#1d4ed8', fontWeight: 'bold', fontSize: 18 }}>
+              View Location
+            </Text>
+            <Text style={{ color: '#3b82f6', fontSize: 12, marginTop: 4 }}>
+              {location ? "GPS Acquired. Tap to adjust." : "Fetching GPS..."}
+            </Text>
+          </View>
+          <Ionicons name="map" size={24} color="#1d4ed8" />
+        </Pressable>
 
         <View className="bg-white rounded-3xl shadow-lg w-10/12 p-6 self-center mt-6">
           <Text className="mb-4 font-bold text-gray-500 text-center">
