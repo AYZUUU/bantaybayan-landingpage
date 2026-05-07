@@ -3,9 +3,10 @@ import { LuPencil, LuSearch, LuTrash2, LuUserPlus } from "react-icons/lu";
 
 interface User {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  role: "Admin" | "Rescuer" | "Citizen";
+  role: "Admin" | "Rescuer" | "Citizen" | "Super_Admin";
 
   registeredAt: string;
 }
@@ -100,8 +101,9 @@ export default function Personnel() {
 
   // --- SEARCH AND FILTER LOGIC ---
   const filteredUsers = users.filter((user) => {
+    const fullName = `${user.first_name} ${user.last_name}`;
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fullName.includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === "All" || user.role === roleFilter;
 
@@ -151,7 +153,7 @@ export default function Personnel() {
           >
             <option value="All">All Roles</option>
             <option value="Admin">Admin</option>
-            <option value="Rescuer">Rescuer</option>
+            <option value="Responder">Responder</option>
             <option value="Citizen">Citizen</option>
           </select>
         </div>
@@ -183,7 +185,7 @@ export default function Personnel() {
                   >
                     <td className="p-4">
                       <div className="font-medium text-slate-900">
-                        {user.name}
+                        {user.first_name} {user.last_name}
                       </div>
                       <div className="text-sm text-slate-500">{user.email}</div>
                     </td>
@@ -204,7 +206,12 @@ export default function Personnel() {
                         <button
                           className="text-red-500 hover:text-red-700 transition-colors"
                           title="Delete User"
-                          onClick={() => handleDelete(user.id, user.name)}
+                          onClick={() =>
+                            handleDelete(
+                              user.id,
+                              user.first_name + " " + user.last_name,
+                            )
+                          }
                         >
                           <LuTrash2 size={18} />
                         </button>
@@ -215,7 +222,7 @@ export default function Personnel() {
               ) : (
                 <tr>
                   <td colSpan={3} className="p-8 text-center text-slate-500">
-                    No users found matching your search criteria.
+                    No users found.
                   </td>
                 </tr>
               )}
@@ -249,10 +256,16 @@ export default function Personnel() {
                   type="text"
                   required
                   className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  value={editingUser.name}
-                  onChange={(e) =>
-                    setEditingUser({ ...editingUser, name: e.target.value })
+                  value={editingUser.first_name + " " + editingUser.last_name}
+                  onChange={(e) =>{
+                    const parts = e.target.value.split(" ");
+                    setEditingUser({
+                      ...editingUser,
+                      first_name: parts[0] || "",
+                      last_name: parts.slice(1).join(" ") || "",
+                    })
                   }
+                }
                 />
               </div>
 

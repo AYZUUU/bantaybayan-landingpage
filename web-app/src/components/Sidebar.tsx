@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import "./sidebar.css";
 
 import {
@@ -13,8 +13,12 @@ import {
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
-
+  const navigate = useNavigate();
   const toggleSidebar = () => setIsOpen(!isOpen);
+
+  const handleLogout = () => {
+    
+  }
 
   return (
     <aside className={`sidebar ${isOpen ? "open" : "closed"}`}>

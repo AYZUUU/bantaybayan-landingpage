@@ -7,6 +7,7 @@ export default function AdminLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = (e: any) => {
     e.preventDefault();
@@ -16,7 +17,9 @@ export default function AdminLogin() {
       return;
     }
 
-    toast.success("Login successful!");
+    setLoading(true);
+    const toastId = toast.loading("Logging in...");
+  
 
     setTimeout(() => {
       navigate("/Incidents");
