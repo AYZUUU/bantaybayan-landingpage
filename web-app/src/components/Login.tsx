@@ -19,9 +19,10 @@ export default function AdminLogin() {
 
     setLoading(true);
     const toastId = toast.loading("Logging in...");
-  
 
+    
     setTimeout(() => {
+      toast.success("Login successful!", { id: toastId });
       navigate("/Incidents");
     }, 1000);
   };
