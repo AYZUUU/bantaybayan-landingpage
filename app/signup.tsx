@@ -16,20 +16,32 @@ import Toast from "react-native-toast-message";
 import { pickSource } from "./_utils/imagepicker";
 
 export default function Signup() {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
+
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [items, setItems] = useState([
-    { label: "Citizen", value: "citizen" },
-    { label: "Rescuer", value: "rescuer" },
+    { label: "Citizen", value: "Citizen" },
+    { label: "Rescuer", value: "Responder" },
+
   ]);
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!name || !email || !password || !value || !photo) {
+    if (
+      !firstName ||
+      !lastName ||
+      !contactNumber ||
+      !email ||
+      !password ||
+      !value ||
+      !photo
+    ) {
       Toast.show({ type: "info", text1: "Missing Fields" });
       return;
     }
@@ -40,7 +52,9 @@ export default function Signup() {
 
     try {
       const formData = new FormData();
-      formData.append("name", name);
+      formData.append("first_name", firstName);
+      formData.append("last_name", lastName);
+      formData.append("contact_number", contactNumber);
       formData.append("email", email);
       formData.append("password", password);
       formData.append("role", value);
@@ -104,20 +118,35 @@ export default function Signup() {
 
             {/* Inputs */}
             <TextInput
-              placeholder="Full Name"
-              className="input-box rounded bg-light-100 h-10 mb-4"
-              value={name}
-              onChangeText={setName}
+              placeholder="First Name"
+              className="input-box rounded bg-light-100 h-10 mb-4 px-3"
+              value={firstName}
+              onChangeText={setFirstName}
+            />
+            <TextInput
+              placeholder="Last Name"
+              className="input-box rounded bg-light-100 h-10 mb-4 px-3"
+              value={lastName}
+              onChangeText={setLastName}
+            />
+            <TextInput
+              placeholder="Contact Number (e.g. 09123456789)"
+              className="input-box rounded bg-light-100 h-10 mb-4 px-3"
+              value={contactNumber}
+              onChangeText={setContactNumber}
+              keyboardType="phone-pad"
             />
             <TextInput
               placeholder="Email"
-              className="input-box rounded bg-light-100 h-10 mb-4"
+              className="input-box rounded bg-light-100 h-10 mb-4 px-3"
               value={email}
               onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
             <TextInput
               placeholder="Password"
-              className="input-box rounded bg-light-100 h-10 mb-4"
+              className="input-box rounded bg-light-100 h-10 mb-4 px-3"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -125,7 +154,7 @@ export default function Signup() {
 
             {/* Dropdown */}
             <DropDownPicker
-              style={{ borderRadius: 7, marginBottom: "auto" }}
+              style={{ borderRadius: 7, marginBottom: 16 }}
               open={open}
               value={value}
               items={items}
@@ -142,11 +171,12 @@ export default function Signup() {
             {/* Upload ID */}
             <Pressable
               onPress={() => pickSource(setPhoto)}
-              className="items-center justify-center rounded-xl mt-4"
+              className="items-center justify-center rounded-xl"
               style={{
                 borderWidth: 2,
                 borderStyle: "dashed",
-                height: 140,
+                borderColor: "#9ca3af",
+                height: 120,
               }}
             >
               {photo ? (
@@ -156,17 +186,20 @@ export default function Signup() {
                   resizeMode="cover"
                 />
               ) : (
-                <Text>Upload your ID</Text>
+                <Text className="text-gray-500 font-semibold">
+                  Upload your ID
+                </Text>
               )}
             </Pressable>
 
             {/* Signup Button */}
             <Pressable
               onPress={handleSignup}
-              className="justify-content items-center mt-5"
+              className="justify-center items-center mt-5 mb-5"
               style={{ opacity: loading ? 0.7 : 1 }}
+              disabled={loading}
             >
-              <View className="bg-accent rounded-xl w-1/2 h-10 justify-center items-center">
+              <View className="bg-accent rounded-xl w-1/2 h-12 justify-center items-center">
                 {loading ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (

@@ -1,10 +1,11 @@
 import {
   AdvancedMarker,
   APIProvider,
-  Map,
   InfoWindow,
+  Map,
 } from "@vis.gl/react-google-maps";
 import { useEffect, useState } from "react";
+import StatusOverviewCards from "../components/StatusOverviewCards";
 
 interface Report {
   id: number;
@@ -44,11 +45,11 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen flex flex-col items-center">
+      <h2 className="text-2xl font-bold mb-2 text-slate-800">
+        BantayBayan Command Center
+      </h2>
+      <StatusOverviewCards reports={reports} />
       <div className="w-full max-w-4xl bg-white p-4 rounded-xl shadow-lg border border-slate-200">
-        <h2 className="text-2xl font-bold mb-2 text-slate-800">
-          Command Center Map
-        </h2>
-
         <div className="w-full h-125 rounded-lg overflow-hidden border-2 border-slate-300">
           <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
             <Map
@@ -75,7 +76,7 @@ export default function Dashboard() {
                   }}
                   onCloseClick={() => setSelectedReport(null)}
                 >
-                  <div className="px-2 pb-2 min-w-[200px] text-slate-800">
+                  <div className="px-2 pb-2 min-w-50 text-slate-800">
                     <h3 className="font-bold text-lg text-red-600 mb-1 border-b pb-1 -mt-2">
                       {selectedReport.accident_type}
                     </h3>
