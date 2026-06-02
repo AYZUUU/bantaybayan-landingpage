@@ -27,8 +27,7 @@ export default function Signup() {
   const [value, setValue] = useState(null);
   const [items, setItems] = useState([
     { label: "Citizen", value: "Citizen" },
-    { label: "Rescuer", value: "Responder" },
-
+    { label: "Responder", value: "Responder" },
   ]);
   const [loading, setLoading] = useState(false);
 

@@ -1,3 +1,4 @@
+
 import * as Location from "expo-location";
 import React, { useEffect, useState } from "react";
 import {
@@ -17,6 +18,9 @@ import { pickSource } from "../_utils/imagecapture";
 import LocationPopup from "../_utils/Popup";
 import WarningPulse from "../_utils/warningpulse";
 
+// 1. IMPORT YOUR AUTH CONTEXT HERE
+import { useAuth } from "../(auth)/auth";
+
 type MyLoc = { latitude: number; longitude: number } | null;
 
 export default function Reporting() {
@@ -24,9 +28,11 @@ export default function Reporting() {
   const [location, setLocation] = useState<MyLoc>(null);
   const [loading, setLoading] = useState(false);
 
-
   const [popupVisible, setPopupVisible] = useState(false); 
   const [isMapVisible, setIsMapVisible] = useState(false); 
+
+  // 2. EXTRACT THE USERNAME FROM CONTEXT
+  const { userName } = useAuth();
 
   const emergencyTypes = [
     { id: "Medical", label: "Medical Emergency" },
@@ -36,7 +42,7 @@ export default function Reporting() {
   ];
 
   const [selectedType, setSelectedType] = useState("Medical");
-  const [reporterName, setReporterName] = useState("");
+  // REMOVED: const [reporterName, setReporterName] = useState(""); <-- No longer needed!
 
   useEffect(() => {
     (async () => {
@@ -51,7 +57,6 @@ export default function Reporting() {
           return;
         }
 
-    
         let lastKnown = await Location.getLastKnownPositionAsync({});
         if (lastKnown) {
           setLocation({
@@ -60,7 +65,6 @@ export default function Reporting() {
           });
         }
 
-      
         let loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
@@ -90,7 +94,8 @@ export default function Reporting() {
       await sendReport({
         emergency_type: selectedType,
         accident_type: selectedType,
-        reporter_name: reporterName,
+        // 3. USE THE CONTEXT USERNAME HERE
+        reporter_name: userName || "Anonymous", 
         latitude: location.latitude,
         longitude: location.longitude,
         image: photo,
@@ -122,7 +127,8 @@ export default function Reporting() {
       await sendReport({
         emergency_type: "Urgent",
         accident_type: "Quick Alert",
-        reporter_name: "Anonymous",
+        // 4. USE THE CONTEXT USERNAME HERE TOO
+        reporter_name: userName || "Anonymous",
         latitude: location.latitude,
         longitude: location.longitude,
       });
@@ -137,8 +143,6 @@ export default function Reporting() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      
-  
       <LocationPopup
         visible={isMapVisible}
         onClose={() => setIsMapVisible(false)}
@@ -150,7 +154,6 @@ export default function Reporting() {
         buttonText="Confirm Location"
       />
 
-   
       <LocationPopup
         visible={popupVisible}
         onClose={() => setPopupVisible(false)}
@@ -172,9 +175,12 @@ export default function Reporting() {
           <Text className="font-bold text-3xl self-center text-gray-800">
             Report Incident
           </Text>
+          {/* Optional visual confirmation of who is reporting */}
+          <Text className="text-center text-gray-500 mt-2">
+            Reporting as: {userName || "Anonymous"}
+          </Text>
         </View>
 
-     
         <Pressable
           onPress={() => setIsMapVisible(true)}
           style={{
@@ -273,3 +279,4 @@ export default function Reporting() {
     </SafeAreaView>
   );
 }
+

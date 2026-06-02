@@ -17,7 +17,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { setIsLoggedIn, setUserRole } = useAuth();
+  const { setIsLoggedIn, setUserRole, setUserName } = useAuth();
   const handleLogin = async () => {
     if (!email || !password) {
       Toast.show({
@@ -37,22 +37,44 @@ export default function LoginScreen() {
         body: JSON.stringify({ email, password }),
       });
 
-      const result = await response.json();
+      // --- TEMPORARY DEBUGGING CODE ---
+      // 1. Read the raw text instead of strictly expecting JSON
+      const rawText = await response.text();
+      
+      // 2. Print exactly what the PHP server sent back
+      console.log("🚨 RAW SERVER RESPONSE 🚨:\n", rawText);
+
+      // 3. Now try to parse it as JSON
+      const result = JSON.parse(rawText);
 
       if (result.status === "success") {
-        setIsLoggedIn(true);
-        setUserRole(result.role);
+        let fullName = "Anonymous";
+        if (result.user && result.user.first_name) {
+           fullName = `${result.user.first_name} ${result.user.last_name}`.trim();
+        }
         Toast.show({
           type: "success",
-          text1: "Welcome back!",
-          text2: "Logging you into BantayBayan...",
+          text1: "Login Successful, Welcome back!",
+          text2: "Redirecting to dashboard...",
         });
 
         setTimeout(() => {
-          if (result.role === "rescuer") {
+          const safeRole = result.role?.toLowerCase()?.trim();
+
+          setUserName(fullName);
+          setIsLoggedIn(true);
+          setUserRole(safeRole);
+
+          if (safeRole === "responder") {
             router.replace("/tabs/rescuer");
-          } else if (result.role === "citizen") {
+          } else if (safeRole === "citizen") {
             router.replace("/tabs/dashboard");
+          } else {
+            Toast.show({
+              type: "error",
+              text1: "Routing Error",
+              text2: "Unknown user role: " + safeRole,
+            });
           }
         }, 2000);
       } else {
@@ -63,6 +85,7 @@ export default function LoginScreen() {
         });
       }
     } catch (error) {
+      console.error("Login Error:", error);
       Toast.show({
         type: "error",
         text1: "Server error",

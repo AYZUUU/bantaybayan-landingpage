@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useOutletContext } from "react-router-dom"; // 1. Import context!
 import toast from "react-hot-toast";
 import { 
   APIProvider, 
@@ -19,32 +20,16 @@ interface Report {
   created_at: string;
 }
 
-export default function AdminDashboard() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
-
-  const fetchReports = async () => {
-    try {
-      const response = await fetch("http://localhost/api/getReports.php");
-      const jsonData = await response.json();
-
-      if (jsonData.status === "success") {
-        setReports(jsonData.data);
-      }
-    } catch (err) {
-      console.error("Error fetching reports:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function Incidents() {
+  // 2. Grab the live reports from the AdminLayout!
+  const { reports } = useOutletContext<{ reports: Report[] }>();
+  
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   const handleStatusChange = async (reportId: number, newStatus: string) => {
     const toastId = toast.loading("Updating status...");
 
     try {
-
       const response = await fetch("http://localhost/api/updateStatus.php", {
         method: "POST",
         headers: {
@@ -57,12 +42,8 @@ export default function AdminDashboard() {
 
       if (data.status === "success") {
         toast.success("Status successfully updated!", { id: toastId });
- 
-        setReports((prevReports) =>
-          prevReports.map((report) =>
-            report.id === reportId ? { ...report, status: newStatus } : report
-          )
-        );
+        // We don't need to manually update state here! 
+        // The AdminLayout will automatically pull the fresh status on its next 5-second tick.
       } else {
         toast.error("Failed to update status.", { id: toastId });
       }
@@ -72,13 +53,7 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchReports();
-    const interval = setInterval(fetchReports, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (loading) return <div className="loading">Loading Reports...</div>;
+  // 3. Removed the loading state entirely because the Layout handles fetching before this page even renders!
 
   return (
     <div className="dashboard">
@@ -89,86 +64,167 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Incident</th>
-              <th>Severity</th>
-              <th>Reporter</th>
-              <th>Evidence</th>
-              <th>Location</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((report) => (
-              <tr key={report.id} className="report-row">
-                <td className="type-cell">{report.accident_type}</td>
-                <td>
-                  <span
-                    className={`badge ${report.accident_level.toLowerCase()}`}
-                  >
-                    {report.accident_level}
-                  </span>
-                </td>
-                <td>{report.reporter_name}</td>
-                <td>
-                  {report.image_path ? (
-                    <img
-                      src={`http://localhost/api/${report.image_path}`}
-                      alt="Proof"
-                      className="thumb"
-                    />
-                  ) : (
-                    "No Photo"
-                  )}
-                </td>
-                <td>
-                  <button className="view-map-btn"
-                  onClick={() => setSelectedLocation({
-                    lat: parseFloat(report.latitude.toString()),
-                    lng: parseFloat(report.longitude.toString())
-                  })}>
-                    View Map
-                  </button>
-                </td>
-                <td>
-          
-                  <select
-                    className="status-select"
-                    value={report.status} 
-                    onChange={(e) => handleStatusChange(report.id, e.target.value)}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="dispatched">Dispatched</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Card-Based Grid Layout */}
+      <div 
+        className="cards-container" 
+        style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+          gap: '20px', 
+          padding: '20px' 
+        }}
+      >
+        {reports.map((report) => (
+          <div 
+            key={report.id} 
+            className="report-card"
+            onClick={() => setSelectedReport(report)}
+            style={{ 
+              backgroundColor: "white", 
+              borderRadius: "12px", 
+              padding: "20px", 
+              boxShadow: "0 4px 10px rgba(0,0,0,0.05)", 
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              border: "1px solid #eaeaea",
+              transition: "transform 0.2s, box-shadow 0.2s"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.05)';
+            }}
+          >
+            {/* Top Row: Incident & Severity */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", color: "#222" }}>{report.accident_type}</h3>
+              <span className={`badge ${report.accident_level?.toLowerCase()}`} style={{ fontSize: "0.8rem", padding: "4px 8px" }}>
+                {report.accident_level}
+              </span>
+            </div>
+
+            {/* Middle Row: Reporter Name */}
+            <p style={{ margin: 0, color: "#666", fontSize: "0.95rem" }}>
+              <strong>Reported by:</strong> {report.reporter_name}
+            </p>
+
+            {/* Bottom Row: Controls & Evidence Indicator */}
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center", 
+              marginTop: "auto", 
+              paddingTop: "15px", 
+              borderTop: "1px solid #f0f0f0" 
+            }}>
+              
+              {/* Status Dropdown */}
+              <select
+                className="status-select"
+                value={report.status} 
+                onClick={(e) => e.stopPropagation()} 
+                onChange={(e) => {
+                  e.stopPropagation(); 
+                  handleStatusChange(report.id, e.target.value);
+                }}
+                style={{ padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "500" }}
+              >
+                <option value="pending">Pending</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="resolved">Resolved</option>
+              </select>
+
+              {/* Quick Indicator if Photo Exists */}
+              <span style={{ fontSize: "0.9rem", color: report.image_path ? "#4D8BE2" : "#999", fontWeight: "500" }}>
+                {report.image_path ? "📸 Photo Attached" : "📍 Map Only"}
+              </span>
+
+            </div>
+          </div>
+        ))}
       </div>
-      {selectedLocation && (
-        <div className="map-modal-overlay" onClick={() => setSelectedLocation(null)}>
-          <div className="map-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="close-modal-btn" onClick={() => setSelectedLocation(null)}>
+
+      {/* Unified Preview Modal */}
+      {selectedReport && (
+        <div 
+          className="map-modal-overlay" 
+          onClick={() => setSelectedReport(null)}
+          style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div 
+            className="map-modal-content" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              backgroundColor: "white", 
+              padding: "25px",
+              borderRadius: "12px",
+              maxWidth: "900px",
+              width: "90%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              position: "relative",
+              display: "grid",
+              gridTemplateColumns: selectedReport.image_path ? "1fr 1fr" : "1fr",
+              gap: "20px"
+            }}
+          >
+            <button 
+              className="close-modal-btn" 
+              onClick={() => setSelectedReport(null)}
+              style={{ position: "absolute", right: "15px", top: "10px", fontSize: "1.8rem", color: "#333", border: "none", background: "none", cursor: "pointer" }}
+            >
               &times;
             </button>
-            <h3 style={{ marginBottom: '15px' }}>Incident Location</h3>
             
-            <div className="map-container" style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden' }}>
-              <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-                <Map
-                  defaultCenter={selectedLocation}
-                  defaultZoom={16}
-                  mapId="BANTAYBAYAN_MODAL_MAP"
-                >
-                  <AdvancedMarker position={selectedLocation} />
-                </Map>
-              </APIProvider>
+            <h3 style={{ gridColumn: "1 / -1", marginTop: 0, borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
+              {selectedReport.accident_type} - Incident Details
+            </h3>
+
+            {/* Render Image Column */}
+            {selectedReport.image_path && (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <h4 style={{ marginBottom: "10px", color: "#555" }}>Visual Evidence</h4>
+                <img 
+                  src={`http://localhost/api/${selectedReport.image_path}`} 
+                  alt="Enlarged Evidence" 
+                  style={{ 
+                    width: "100%", 
+                    height: "350px", 
+                    borderRadius: "8px", 
+                    objectFit: "contain",
+                    backgroundColor: "#f3f4f6"
+                  }} 
+                />
+              </div>
+            )}
+
+            {/* Render Map Column */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <h4 style={{ marginBottom: "10px", color: "#555" }}>Exact Location</h4>
+              <div style={{ width: '100%', height: '350px', borderRadius: '8px', overflow: 'hidden' }}>
+                <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+                  <Map
+                    defaultCenter={{
+                      lat: parseFloat(selectedReport.latitude.toString()),
+                      lng: parseFloat(selectedReport.longitude.toString())
+                    }}
+                    defaultZoom={16}
+                    mapId="BANTAYBAYAN_MODAL_MAP"
+                  >
+                    <AdvancedMarker position={{
+                      lat: parseFloat(selectedReport.latitude.toString()),
+                      lng: parseFloat(selectedReport.longitude.toString())
+                    }} />
+                  </Map>
+                </APIProvider>
+              </div>
             </div>
+
           </div>
         </div>
       )}

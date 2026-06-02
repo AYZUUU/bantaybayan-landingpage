@@ -17,7 +17,7 @@ export default function Personnel() {
   const [roleFilter, setRoleFilter] = useState("All");
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // --- DELETE USER ---
+
   const handleDelete = async (userId: string, userName: string) => {
     const confirmDelete = window.confirm(
       `Are you sure you want to delete the user "${userName}"? This action cannot be undone.`,

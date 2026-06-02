@@ -8,6 +8,7 @@ import AdminLogin from "./components/Login";
 
 import Dashboard from "./(pages)/dashboard";
 import Settings from "./(pages)/Settings";
+import Superadmin from "./(pages)/Superadmin";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/personnel" element={<Personnel />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/settings" element={<Settings/>} />
+          <Route path="/superadmin" element={<Superadmin />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />

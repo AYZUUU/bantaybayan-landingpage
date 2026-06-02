@@ -19,7 +19,7 @@ interface Report {
 }
 
 export default function Dashboard() {
-  const viganCenter = { lat: 17.5747, lng: 120.3868 };
+
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
 
@@ -53,7 +53,7 @@ export default function Dashboard() {
         <div className="w-full h-125 rounded-lg overflow-hidden border-2 border-slate-300">
           <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
             <Map
-              defaultCenter={viganCenter}
+
               defaultZoom={10}
               mapId="BANTAYBAYAN_MAP"
             >
