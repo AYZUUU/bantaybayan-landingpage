@@ -54,7 +54,8 @@ export default function Dashboard() {
           <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
             <Map
 
-              defaultZoom={10}
+              defaultZoom={14}
+              defaultCenter={{ lat: 17.567936, lng: 120.390581 }}
               mapId="BANTAYBAYAN_MAP"
             >
               {reports.map((report) => (

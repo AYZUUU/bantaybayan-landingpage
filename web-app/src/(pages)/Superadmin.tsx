@@ -14,6 +14,15 @@ interface Admin {
   status: "Active" | "Offline" | "Suspended"; 
 }
 
+// 1. Added a Citizen interface 
+// (Adjust these fields based on what your getCitizens.php actually returns)
+interface Citizen {
+  id: number;
+  name: string;
+  contact: string;
+  status: string;
+}
+
 interface StatCardProps {
   icon: React.ReactNode;
   title: string;
@@ -21,7 +30,6 @@ interface StatCardProps {
   trend: string;
 }
 
-// We need to know what a Report looks like to count them
 interface Report {
   id: number;
   status: string;
@@ -29,13 +37,14 @@ interface Report {
 
 export default function Superadmin() {
   const [admins, setAdmins] = useState<Admin[]>([]);
+  
+  // 2. Added state for the citizens array
+  const [citizens, setCitizens] = useState<Citizen[]>([]);
   const [citizenCount, setCitizenCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
-  // 2. Magically grab the live reports from your AdminLayout!
   const { reports } = useOutletContext<{ reports: Report[] }>();
 
-  // 3. Calculate your dynamic report stats
   const totalReports = reports.length;
   const unresolvedReports = reports.filter((report) => report.status === "Pending").length;
 
@@ -61,7 +70,19 @@ export default function Superadmin() {
         }
 
         if (citizenJson.status === "success") {
-          setCitizenCount(citizenJson.count); 
+          // Keep the count if your API provides it, or fallback to array length
+          setCitizenCount(citizenJson.count || (citizenJson.data ? citizenJson.data.length : 0)); 
+          
+          // 3. Map the citizen data if your PHP file returns a "data" array
+          if (citizenJson.data) {
+            const mappedCitizens = citizenJson.data.map((user: any) => ({
+              id: user.id,
+              name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown',
+              contact: user.email || user.contact_number || 'N/A', // Adjust based on your DB columns
+              status: user.status || "Active"
+            }));
+            setCitizens(mappedCitizens);
+          }
         }
 
       } catch (error) {
@@ -88,34 +109,29 @@ export default function Superadmin() {
         </button>
       </div>
 
-      {/* FIXED: Changed to md:grid-cols-3 so the 3 cards space out evenly */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        
         <StatCard 
           icon={<LuUsers size={28} className="text-blue-600" />} 
           title="Total Citizens" 
           value={citizenCount} 
           trend="Registered on app" 
         />
-        
         <StatCard 
           icon={<LuShieldCheck size={28} className="text-green-600" />} 
           title="Active Admins" 
           value={admins.length} 
           trend="Currently registered" 
         />
-        
         <StatCard 
           icon={<LuTriangle size={28} className="text-red-600" />} 
           title="Total Reports" 
           value={totalReports} 
           trend={`${unresolvedReports} unresolved`} 
         />
-        
       </div>
 
-      {/* FIXED: Removed the grid columns completely so the table takes up 100% of the space naturally */}
-      <div className="w-full">
+      <div className="w-full flex flex-col gap-8">
         
         {/* Admin Management Table */}
         <div className="bg-white w-full rounded-xl shadow-sm border border-gray-100 p-6">
@@ -154,6 +170,54 @@ export default function Superadmin() {
                   {admins.length === 0 && (
                     <tr>
                       <td colSpan={4} className="py-4 text-center text-gray-500">No admins found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* 4. Added Citizen Management Table */}
+        <div className="bg-white w-full rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-800">Citizen Accounts</h2>
+            <button className="text-sm text-blue-600 hover:underline font-medium">View All</button>
+          </div>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <p className="text-gray-500 py-4">Loading citizens...</p>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Contact</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {citizens.map((citizen) => (
+                    <tr key={citizen.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium text-gray-800">{citizen.name}</td>
+                      <td className="py-3 px-4 text-gray-600">{citizen.contact}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          citizen.status === "Active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        }`}>
+                          {citizen.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button className="text-blue-600 hover:underline mr-3">View</button>
+                        <button className="text-red-600 hover:underline">Suspend</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {citizens.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-4 text-center text-gray-500">No citizens found. Make sure getCitizens.php returns a data array.</td>
                     </tr>
                   )}
                 </tbody>
