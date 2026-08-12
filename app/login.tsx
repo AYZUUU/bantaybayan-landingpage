@@ -37,14 +37,13 @@ export default function LoginScreen() {
         body: JSON.stringify({ email, password }),
       });
 
-      // --- TEMPORARY DEBUGGING CODE ---
-      // 1. Read the raw text instead of strictly expecting JSON
+
       const rawText = await response.text();
       
-      // 2. Print exactly what the PHP server sent back
+
       console.log("🚨 RAW SERVER RESPONSE 🚨:\n", rawText);
 
-      // 3. Now try to parse it as JSON
+
       const result = JSON.parse(rawText);
 
       if (result.status === "success") {

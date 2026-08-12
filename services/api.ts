@@ -2,7 +2,7 @@ const BASE_URL = "http://192.168.100.108/api";
 
 export const sendReport = async (report: {
   emergency_type: string;
-  accident_type: string;
+  accident_level: string;
   reporter_name: string;
   latitude: number;
   longitude: number;
@@ -10,8 +10,8 @@ export const sendReport = async (report: {
   image?: string | null;
 }) => {
   const formData = new FormData();
-  formData.append("accident_level", report.emergency_type);
-  formData.append("accident_type", report.accident_type);
+  formData.append("accident_level", report.accident_level || "Urgent");
+  formData.append("emergency_type", report.emergency_type);
   formData.append("reporter_name", report.reporter_name);
   formData.append("latitude", report.latitude.toString());
   formData.append("longitude", report.longitude.toString());

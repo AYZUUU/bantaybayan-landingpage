@@ -1,6 +1,6 @@
 import React, { createContext, ReactNode, useContext, useState } from "react";
 
-// 1. Add userName and setUserName to the TypeScript Interface
+
 interface AuthContextType {
   isLoggedIn: boolean;
   setIsLoggedIn: (value: boolean) => void;
@@ -16,7 +16,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedInState] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   
-  // 2. Create the state to hold the user's name
+
   const [userName, setUserName] = useState<string | null>(null);
 
   const setIsLoggedIn = (value: boolean) => {
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    // 3. Pass the new name variables down through the Provider
+
     <AuthContext.Provider 
       value={{ 
         isLoggedIn, 

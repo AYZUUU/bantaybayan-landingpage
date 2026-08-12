@@ -12,7 +12,7 @@ import {
 
 export interface Report {
   id: string;
-  accident_type: string;
+
   accident_level: string;
   status: string;
   created_at: string;
@@ -55,7 +55,6 @@ export default function Card({ userReports }: CardProps) {
             userReports.map((report) => (
               <View key={report.id} className="mb-3">
                 <Text className="text-gray-800 font-bold">
-                  • {report.accident_type}
                 </Text>
                 <Text className="text-gray-500 ml-3 text-sm">
                   Status: {report.status} | Time: {report.created_at}

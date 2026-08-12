@@ -1,85 +1,61 @@
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import React, { useState } from "react";
-import {
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  Text,
-  UIManager,
-  View,
-} from "react-native";
-
+import React from "react";
+import { View, Text, Pressable } from "react-native";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 
 export interface Report {
- id: string;
-  accident_type: string;
-  accident_level: string;
-  reporter_name: string;
-  latitude: string;
-  longitude: string;
-  status: string;
-  created_at: string;
-  description?: string | null;
+  id: string | number;
+  emergency_type?: string; 
+  accident_level?: string; 
+  reporter_name?: string;  
+  latitude?: number;
+  longitude?: number;
+  description?: string;
+  created_at?: string; // Optional: If your DB sends a timestamp
 }
 
-
-interface RescuerCard {
+interface RescuerCardProps {
   recentReports: Report[];
+  // 1. ADD THIS PROP so the card can talk to the main screen
+  onViewDetails?: (report: Report) => void; 
 }
 
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-
-export default function RescuerCard({ recentReports }: RescuerCard) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const toggleCard = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsExpanded(!isExpanded);
-  };
-
+export default function RescuerCard({ recentReports, onViewDetails }: RescuerCardProps) {
   return (
-    <Pressable
-      className="bg-white rounded-xl p-6 shadow-md border-l-4 border-red-500"
-      onPress={toggleCard}
-    >
-      <View className="flex-row justify-between items-center mb-4">
-        <View>
-          <Text className="text-xl font-bold text-slate-800">Latest Emergencies</Text>
-          <Text className="text-gray-500">Showing {recentReports.length} reports</Text>
-        </View>
-        <View className="bg-red-100 p-3 rounded-full">
-          <FontAwesome6 name="triangle-exclamation" size={20} color="#ef4444" />
-        </View>
-      </View>
-
-
+    <View className="w-full">
+      <Text className="text-lg font-bold text-gray-800 mb-4 mt-6">Recent Reports</Text>
+      
       {recentReports.map((report, index) => (
-        <View 
-          key={report.id} 
-        
-          className={`py-3 ${index !== recentReports.length - 1 ? 'border-b border-gray-100' : ''}`}
-        >
-          <View className="flex-row justify-between">
-            <Text className="text-lg font-bold text-gray-800">{report.accident_type}</Text>
-            <Text className="text-sm font-bold text-red-500">{report.accident_level}</Text>
+        <View key={report.id || index} className="bg-white rounded-2xl p-5 mb-4 shadow-sm border border-gray-100">
+          <View className="flex-row items-center mb-3">
+            <View className="bg-red-100 p-3 rounded-full mr-4">
+              <FontAwesome5 name="exclamation-circle" size={24} color="#dc2626" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-xl font-bold text-gray-900">
+                {report.emergency_type || "Unknown Emergency"}
+              </Text>
+              <Text className="text-sm text-orange-600 font-bold mt-1">
+                Severity: {report.accident_level || "Unspecified"}
+              </Text>
+            </View>
+          </View>
+          
+          <View className="flex-row justify-between items-center mt-2">
+            <Text className="text-gray-500 text-sm flex-1" numberOfLines={1}>
+              Reported by: {report.reporter_name || "Anonymous"}
+            </Text>
           </View>
 
-          {isExpanded && (
-            <View className="mt-2 bg-gray-50 p-3 rounded-lg">
-              <Text className="text-gray-600 mb-1">Reporter: {report.reporter_name}</Text>
-              <Text className="text-gray-600 mb-1">Time: {report.created_at}</Text>
-              <Text className="text-gray-600">Coords: {report.latitude}, {report.longitude}</Text>
-            </View>
-          )}
+          {/* 2. ADD THE BUTTON HERE */}
+          <Pressable 
+            onPress={() => onViewDetails && onViewDetails(report)}
+            className="bg-gray-100 mt-4 py-3 rounded-xl items-center border border-gray-200"
+          >
+            <Text className="text-gray-700 font-bold text-base">View Details</Text>
+          </Pressable>
+
         </View>
       ))}
-
-      <View className="mt-2 items-center">
-        <FontAwesome6 name={isExpanded ? "angle-up" : "angle-down"} size={24} color="#94a3b8" />
-      </View>
-    </Pressable>
+    </View>
   );
 }

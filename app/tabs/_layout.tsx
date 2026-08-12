@@ -44,7 +44,7 @@ export default function TabLayout() {
           options={{
             title: "Rescuer",
             headerShown: false,
-            // ONLY show to responders/rescuers
+           
             href: isLoggedIn && isResponder ? undefined : null,
             tabBarIcon: ({ color }) => (
               <Ionicons name="medkit" size={28} color={color} />
