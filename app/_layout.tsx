@@ -1,8 +1,13 @@
+import "./global.css";
 import { Stack } from "expo-router";
 import { View } from "react-native";
 import Toast from "react-native-toast-message";
 import { AuthProvider } from "./(auth)/auth";
-import "./globals.css";
+import {LogBox} from "react-native"
+
+
+
+LogBox.ignoreAllLogs(true);
 
 export default function RootLayout() {
   return (

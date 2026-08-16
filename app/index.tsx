@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
-import { Image, ImageBackground, Pressable, Text, View } from "react-native";
+import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Index() {
@@ -19,46 +19,45 @@ export default function Index() {
           colors={["rgba(255, 255, 255, 0.6)", "rgba(77, 139, 226, 0.6)"]}
           style={{ flex: 1 }}
         >
-          <View className="justify-center items-center">
+          <View style={styles.centerContainer}>
             <Image
               source={require("../assets/images/bantaybayan.png")}
-              className="w-56 h-56"
+              style={styles.logoImage}
               resizeMode="contain"
             />
 
             <Text
-              className="text-primary font-bold text-2xl mb-10"
-              style={{
-                textShadowColor: "rgba(0,0,0,0.9)",
-                textShadowOffset: { width: 0.5, height: 0.5 },
-                textShadowRadius: 1,
-              }}
+              style={[
+                styles.welcomeText,
+                {
+                  textShadowColor: "rgba(0,0,0,0.9)",
+                  textShadowOffset: { width: 0.5, height: 0.5 },
+                  textShadowRadius: 1,
+                },
+              ]}
             >
               Welcome To BantayBayan
             </Text>
-            {
-              [
-                /* box for report incident */
-              ]
-            }
-            <Link href="/tabs/reporting">
-              <View className="bg-box items-center mt-20 object-center w-48 h-52 rounded-2xl">
+
+            <Link href="/tabs/reporting" asChild>
+              <Pressable style={styles.reportBox}>
                 <Image
                   source={require("../assets/report.png")}
-                  className="w-40 h-40 mb-2 mr-4"
+                  style={styles.reportIcon}
+                  resizeMode="contain"
                 />
-                <Text
-                  style={{ color: "#FFFFFF", fontWeight: "bold", fontSize: 18 }}
-                >
+                <Text style={styles.reportText}>
                   Report an Incident
                 </Text>
-              </View>
+              </Pressable>
             </Link>
 
             <Pressable onPress={() => router.push("/login")}>
-              <Text className="bg-primary bg-container font-bold text-center text-box text-2xl px-7 py-3 rounded-2xl mt-40  p-4 shadow-lg">
-                Login/Signup
-              </Text>
+              <View style={styles.loginButton}>
+                <Text style={styles.loginButtonText}>
+                  Login/Signup
+                </Text>
+              </View>
             </Pressable>
           </View>
         </LinearGradient>
@@ -66,3 +65,60 @@ export default function Index() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logoImage: {
+    width: 300, // w-56
+    height: 300, // h-56
+  },
+  welcomeText: {
+    color: "#FFFFFF", // primary
+    fontWeight: "bold",
+    fontSize: 24, // text-2xl
+    marginBottom: 20, // mb-10
+  },
+  reportBox: {
+    backgroundColor: "#2A4C7C", // box color
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10, // mt-20
+    width: 192, // w-48
+    height: 208, // h-52
+    borderRadius: 16, // rounded-2xl
+  },
+  reportIcon: {
+    width: 160, // w-40
+    height: 160, // h-40
+    marginBottom: 8, // mb-2
+    marginRight: 16, // mr-4
+  },
+  reportText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  loginButton: {
+    backgroundColor: "#FFFFFF", // primary
+    borderRadius: 16, // rounded-2xl
+    marginTop: 40, // mt-40
+    paddingHorizontal: 28, // px-7
+    paddingVertical: 12, // py-3
+    padding: 16, // p-4
+    elevation: 5, // shadow-lg
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  loginButtonText: {
+    color: "#2A4C7C", // text-box
+    fontSize: 24, // text-2xl
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+});

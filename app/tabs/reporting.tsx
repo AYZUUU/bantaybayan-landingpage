@@ -6,6 +6,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -75,8 +76,7 @@ export default function Reporting() {
     })();
   }, []);
 
-  const severityLevels = ["Low", "Medium", "High", "Critical"];
-  const [selectedLevel, setSelectedLevel] = useState("Medium");
+  const [selectedLevel] = useState("Medium");
 
   const handleSubmit = async () => {
     if (!location)
@@ -130,7 +130,7 @@ export default function Reporting() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={styles.safeArea}>
       <LocationPopup
         visible={isMapVisible}
         onClose={() => setIsMapVisible(false)}
@@ -160,58 +160,33 @@ export default function Reporting() {
         buttonText="Return to Dashboard"
       />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <View className="items-center mt-10">
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.quickReportContainer}>
           <Pressable onPress={handleQuickReport}>
             <WarningPulse />
           </Pressable>
-          <Text className="mt-4 text-gray-400">Tap for Quick Emergency</Text>
+          <Text style={styles.quickReportSubText}>Tap for Quick Emergency</Text>
         </View>
-        <View className="mt-10">
-          <Text className="font-bold text-3xl self-center text-gray-800">
-            Report Incident
-          </Text>
-          {/* Optional visual confirmation of who is reporting */}
-          <Text className="text-center text-gray-500 mt-2">
+
+        <View style={styles.headerContainer}>
+          <Text style={styles.titleText}>Report Incident</Text>
+          <Text style={styles.reporterText}>
             Reporting as: {userName || "Anonymous"}
           </Text>
         </View>
-        <Pressable
-          onPress={() => setIsMapVisible(true)}
-          style={{
-            backgroundColor: "#eff6ff",
-            width: "83.3%",
-            alignSelf: "center",
-            padding: 16,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: "#bfdbfe",
-            marginTop: 24,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 2,
-          }}
-        >
+
+        <Pressable onPress={() => setIsMapVisible(true)} style={styles.locationCard}>
           <View>
-            <Text
-              style={{ color: "#1d4ed8", fontWeight: "bold", fontSize: 18 }}
-            >
-              View Location
-            </Text>
-            <Text style={{ color: "#3b82f6", fontSize: 12, marginTop: 4 }}>
+            <Text style={styles.locationTitle}>View Location</Text>
+            <Text style={styles.locationSubText}>
               {location ? "GPS Acquired. Tap to adjust." : "Fetching GPS..."}
             </Text>
           </View>
           <Ionicons name="map" size={24} color="#1d4ed8" />
         </Pressable>
 
-        <View className="bg-white rounded-3xl shadow-lg w-10/12 p-6 self-center mt-6">
-          <Text className="mb-4 font-bold text-gray-500 text-center">
+        <View style={styles.emergencyCard}>
+          <Text style={styles.emergencyCardTitle}>
             Select Emergency Type:
           </Text>
           <View>
@@ -221,16 +196,18 @@ export default function Reporting() {
                 <Pressable
                   key={type.id}
                   onPress={() => setSelectedType(type.id)}
-                  className={`mb-3 p-4 rounded-xl border-2 items-center ${
+                  style={[
+                    styles.emergencyButton,
                     isActive
-                      ? "bg-red-500 border-red-500"
-                      : "bg-transparent border-gray-300"
-                  }`}
+                      ? styles.emergencyButtonActive
+                      : styles.emergencyButtonInactive,
+                  ]}
                 >
                   <Text
-                    className={`font-bold text-lg ${
-                      isActive ? "text-white" : "text-gray-600"
-                    }`}
+                    style={[
+                      styles.emergencyButtonText,
+                      isActive ? styles.textActive : styles.textInactive,
+                    ]}
                   >
                     {type.label}
                   </Text>
@@ -240,51 +217,40 @@ export default function Reporting() {
           </View>
         </View>
 
-        <View className="mt-8 items-center">
+        <View style={styles.bottomContainer}>
           <Pressable
             onPress={() => pickSource(setPhoto)}
-            className="w-10/12 h-96 border-2 border-dashed border-gray-300 rounded-2xl items-center justify-center bg-gray-50"
+            style={styles.photoContainer}
           >
             {photo ? (
               <Image
                 source={{ uri: photo }}
-                className="w-full h-full rounded-2xl"
+                style={styles.attachedImage}
                 resizeMode="cover"
               />
             ) : (
-              <Text className="text-gray-400 font-bold">Attach Photo</Text>
+              <Text style={styles.attachPhotoText}>Attach Photo</Text>
             )}
           </Pressable>
 
-          {/* Warning about misuse of the app */}
-          
-         
-           <View className="w-10/12 mt-6 p-4 rounded-2xl bg-red-50 border border-red-200">
-          
-            <Text
-              style={{ color: "#C82909", fontWeight: "bold", fontSize: 18 }}
-            >
-             <Ionicons name="warning-sharp" size={24} color="#C82909" /> Note:
-            </Text> 
-            
-            <Text style={{ color: "#F54927", fontSize: 12, marginTop: 4 }}>
+          <View style={styles.warningContainer}>
+            <Text style={styles.warningTitle}>
+              <Ionicons name="warning-sharp" size={20} color="#C82909" /> Note:
+            </Text>
+            <Text style={styles.warningSubText}>
               Misuse of this app may lead to legal consequences.
             </Text>
-           </View>
-           
-   
+          </View>
 
           <Pressable
             onPress={handleSubmit}
             disabled={loading}
-            className={`w-10/12 mt-6 p-4 rounded-2xl bg-black ${
-              loading ? "opacity-50" : ""
-            }`}
+            style={[styles.submitButton, loading && { opacity: 0.5 }]}
           >
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-white text-center font-bold text-lg">
+              <Text style={styles.submitButtonText}>
                 Send Detailed Report
               </Text>
             )}
@@ -294,3 +260,165 @@ export default function Reporting() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  quickReportContainer: {
+    alignItems: "center",
+    marginTop: 40,
+  },
+  quickReportSubText: {
+    marginTop: 16,
+    color: "#9CA3AF",
+  },
+  headerContainer: {
+    marginTop: 32,
+  },
+  titleText: {
+    fontWeight: "bold",
+    fontSize: 30,
+    alignSelf: "center",
+    color: "#1F2937",
+  },
+  reporterText: {
+    textAlign: "center",
+    color: "#6B7280",
+    marginTop: 8,
+  },
+  locationCard: {
+    backgroundColor: "#eff6ff",
+    width: "83.3%",
+    alignSelf: "center",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    marginTop: 24,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  locationTitle: {
+    color: "#1d4ed8",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  locationSubText: {
+    color: "#3b82f6",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  emergencyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+    width: "83.3%",
+    padding: 24,
+    alignSelf: "center",
+    marginTop: 24,
+  },
+  emergencyCardTitle: {
+    marginBottom: 16,
+    fontWeight: "bold",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  emergencyButton: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+  },
+  emergencyButtonActive: {
+    backgroundColor: "#EF4444",
+    borderColor: "#EF4444",
+  },
+  emergencyButtonInactive: {
+    backgroundColor: "transparent",
+    borderColor: "#D1D5DB",
+  },
+  emergencyButtonText: {
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  textActive: {
+    color: "#FFFFFF",
+  },
+  textInactive: {
+    color: "#4B5563",
+  },
+  bottomContainer: {
+    marginTop: 32,
+    alignItems: "center",
+  },
+  photoContainer: {
+    width: "83.3%",
+    height: 384,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#D1D5DB",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F9FAFB",
+  },
+  attachedImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 16,
+  },
+  attachPhotoText: {
+    color: "#9CA3AF",
+    fontWeight: "bold",
+  },
+  warningContainer: {
+    width: "83.3%",
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+  },
+  warningTitle: {
+    color: "#C82909",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  warningSubText: {
+    color: "#F54927",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  submitButton: {
+    width: "83.3%",
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#000000",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+});

@@ -1,345 +1,286 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
   View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  StyleSheet,
 } from "react-native";
-import DropDownPicker from "react-native-dropdown-picker";
+import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Toast from "react-native-toast-message";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import * as MediaLibrary from "expo-media-library";
-import * as Sharing from "expo-sharing";
-import { pickSource } from "./_utils/imagepicker";
+import { LinearGradient } from "expo-linear-gradient";
 
-interface IDScannerModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onCapture: (uri: string) => void;
-}
+export default function Preview() {
+  const params = useLocalSearchParams();
+  const { firstName, lastName, contactNumber, email, role, photo } = params;
 
-const IDScannerModal: React.FC<IDScannerModalProps> = ({
-  visible,
-  onClose,
-  onCapture,
-}) => {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
-  const cameraRef = useRef<CameraView>(null);
+  const handleConfirm = async () => {
+    try {
+      // 1. Create a FormData object to bundle text data and the image file together
+      const formData = new FormData();
+      formData.append("first_name", firstName as string);
+      formData.append("last_name", lastName as string);
+      formData.append("contact_number", contactNumber as string);
+      formData.append("email", email as string);
+      formData.append("role", role as string);
 
-  const [capturing, setCapturing] = useState(false);
-  const [enableTorch, setEnableTorch] = useState(false);
+      // 2. Format the image URI for React Native's FormData upload
+      if (photo) {
+        const uriParts = (photo as string).split(".");
+        const fileType = uriParts[uriParts.length - 1];
 
-  useEffect(() => {
-    if (visible && !permission?.granted) {
-      requestPermission();
-    }
-  }, [visible, permission]);
-
-  const handleTakePicture = async () => {
-    if (cameraRef.current && !capturing) {
-      try {
-        setCapturing(true);
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.9,
-          skipProcessing: false,
-        });
-
-        if (photo?.uri) {
-          try {
-            let perm = mediaPermission;
-            if (!perm?.granted) {
-              perm = await requestMediaPermission();
-            }
-            if (perm?.granted) {
-              await MediaLibrary.createAssetAsync(photo.uri);
-            }
-          } catch (e) {
-            console.log("Failed to save asset to gallery:", e);
-          }
-
-          onCapture(photo.uri);
-          onClose();
-        }
-      } catch (error) {
-        console.error("Failed to capture ID:", error);
-      } finally {
-        setCapturing(false);
+        formData.append("user_id_photo", {
+          uri: photo as string,
+          name: `id_${Date.now()}.${fileType}`,
+          type: `image/${fileType}`,
+        } as any);
       }
+
+      // 3. Send package to your backend PHP endpoint
+      const response = await fetch("http://192.168.100.108/api/registerUser.php", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.status === "success") {
+        Alert.alert(
+          "Registration Submitted",
+          "Your account details and ID have been securely submitted. Please wait for Superadmin verification to activate your account.",
+          [
+            {
+              text: "Understood",
+              onPress: () => {
+                router.replace("/"); 
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Registration Failed", result.message || "Something went wrong.");
+      }
+    } catch (error) {
+      console.error("Network or Server Error:", error);
+      Alert.alert("Error", "Could not connect to the server. Check your network connection.");
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
-      <View className="flex-1 bg-black">
-        {permission?.granted ? (
-          <CameraView
-            ref={cameraRef}
-            className="absolute inset-0"
-            facing="back"
-            enableTorch={enableTorch}
-          >
-            <SafeAreaView className="flex-1 justify-between">
-              {/* Header */}
-              <View className="flex-row justify-between px-5 pt-5 mt-7">
-                <TouchableOpacity
-                  onPress={onClose}
-                  className="bg-black/60 px-4 py-2 rounded-full"
-                >
-                  <Text className="text-white font-semibold text-sm">
-                    ✕ Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setEnableTorch((prev) => !prev)}
-                  className="bg-black/60 px-4 py-2 rounded-full"
-                >
-                  <Text className="text-white font-semibold text-sm">
-                    {enableTorch ? "🔦 Flash ON" : "⚡ Flash OFF"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Framing Guide */}
-              <View className="items-center justify-center px-5">
-                <View
-                  className="w-[90%] border-2 border-emerald-500 rounded-2xl bg-white/5"
-                  style={{ aspectRatio: 1.586 }}
-                />
-                <Text className="text-white mt-4 text-sm font-medium text-center bg-black/50 px-3 py-1.5 rounded-lg overflow-hidden">
-                  Position the ID card inside the frame
-                </Text>
-              </View>
-
-              {/* Shutter Footer */}
-              <View className="items-center pb-8">
-                <TouchableOpacity
-                  onPress={handleTakePicture}
-                  disabled={capturing}
-                  className="w-18 h-18 rounded-full border-4 border-white justify-center items-center bg-white/30"
-                  style={{ width: 72, height: 72 }}
-                >
-                  {capturing ? (
-                    <ActivityIndicator size="small" color="#000000" />
-                  ) : (
-                    <View className="w-14 h-14 rounded-full bg-white" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-          </CameraView>
-        ) : (
-          <SafeAreaView className="flex-1 justify-center items-center bg-gray-900">
-            <ActivityIndicator size="large" color="#ffffff" />
-            <Text className="text-white mt-3">
-              Requesting Camera Permission...
-            </Text>
-            <TouchableOpacity onPress={onClose} className="mt-5">
-              <Text className="text-blue-500 font-bold">Cancel</Text>
-            </TouchableOpacity>
-          </SafeAreaView>
-        )}
-      </View>
-    </Modal>
-  );
-};
-
-export default function Signup() {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [contactNumber, setContactNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [photo, setPhoto] = useState<string | null>(null);
-
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(null);
-  const [items, setItems] = useState([
-    { label: "Citizen", value: "Citizen" },
-    { label: "Responder", value: "Responder" },
-  ]);
-
-  const handleExportPhoto = async () => {
-    if (!photo) return;
-    const isAvailable = await Sharing.isAvailableAsync();
-    if (isAvailable) {
-      await Sharing.shareAsync(photo);
-    } else {
-      Toast.show({ type: "info", text1: "Sharing not supported on device" });
-    }
-  };
-
-  const handleGoToPreview = () => {
-    if (
-      !firstName ||
-      !lastName ||
-      !contactNumber ||
-      !email ||
-      !password ||
-      !value ||
-      !photo
-    ) {
-      Toast.show({ type: "info", text1: "Please complete all fields" });
-      return;
-    }
-
-    router.push({
-      pathname: "/preview",
-      params: {
-        firstName,
-        lastName,
-        contactNumber,
-        email,
-        password,
-        role: value,
-        photo,
-      },
-    });
-  };
-
-  return (
-    <LinearGradient colors={["#ffffff", "#4D8BE2"]} className="flex-1">
-      <SafeAreaView className="flex-1 items-center mt-5">
-        <View className="h-auto bg-white rounded-3xl shadow-lg w-10/12 mb-1 p-6 z-10">
+    <LinearGradient colors={["#ffffff", "#4D8BE2"]} style={styles.gradientBackground}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.card}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
           >
-            <Image
-              source={require("../assets/images/bantaybayan.png")}
-              className="w-56 h-56 self-center"
-              resizeMode="contain"
-            />
-            <Text className="font-bold text-lg text-center mb-4 text-gray-800">
-              Create Account
+            <Text style={styles.title}>Review Details</Text>
+            <Text style={styles.subtitle}>
+              Please ensure all information and your ID are clear before submitting.
             </Text>
 
-            <TextInput
-              placeholder="First Name"
-              className="rounded bg-gray-100 h-10 mb-4 px-3 text-gray-800"
-              value={firstName}
-              onChangeText={setFirstName}
-            />
-            <TextInput
-              placeholder="Last Name"
-              className="rounded bg-gray-100 h-10 mb-4 px-3 text-gray-800"
-              value={lastName}
-              onChangeText={setLastName}
-            />
-            <TextInput
-              placeholder="Contact Number (e.g. 09123456789)"
-              className="rounded bg-gray-100 h-10 mb-4 px-3 text-gray-800"
-              value={contactNumber}
-              onChangeText={setContactNumber}
-              keyboardType="phone-pad"
-            />
-            <TextInput
-              placeholder="Email"
-              className="rounded bg-gray-100 h-10 mb-4 px-3 text-gray-800"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              placeholder="Password"
-              className="rounded bg-gray-100 h-10 mb-4 px-3 text-gray-800"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-
-            <DropDownPicker
-              style={{ borderRadius: 7, marginBottom: 16 }}
-              open={open}
-              value={value}
-              items={items}
-              setOpen={setOpen}
-              setValue={setValue}
-              setItems={setItems}
-              placeholder="Select role"
-              zIndex={1000}
-              zIndexInverse={3000}
-              dropDownDirection="BOTTOM"
-              listMode="SCROLLVIEW"
-            />
-
-            {/* ID Capture Preview Box */}
-            <Pressable
-              onPress={() => {
-                if (photo) {
-                  pickSource(setPhoto);
-                } else {
-                  setIsScannerOpen(true);
-                }
-              }}
-              className={`items-center justify-center rounded-xl overflow-hidden h-30 ${
-                photo ? "" : "border-2 border-dashed border-gray-400"
-              }`}
-              style={{ height: 120 }}
-            >
-              {photo ? (
-                <Image
-                  source={{ uri: photo }}
-                  className="w-full h-full rounded-xl"
-                  resizeMode="cover"
-                />
-              ) : (
-                <View className="items-center">
-                  <Text className="text-gray-500 font-semibold">
-                    Tap to Scan ID
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            {photo && (
-              <View className="flex-row justify-between mt-2">
-                <TouchableOpacity onPress={handleExportPhoto}>
-                  <Text className="text-blue-600 font-semibold">
-                    📤 Share ID
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setIsScannerOpen(true)}>
-                  <Text className="text-red-500 font-semibold">
-                    📷 Rescan ID
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Next / Preview Button */}
-            <Pressable
-              onPress={handleGoToPreview}
-              className="justify-center items-center mt-5 mb-5"
-            >
-              <View className="bg-blue-600 rounded-xl w-3/4 h-12 justify-center items-center shadow">
-                <Text className="text-white font-bold text-lg">
-                  Preview Details
+            {/* Display Data */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Full Name</Text>
+              <View style={styles.valueBox}>
+                <Text style={styles.valueText}>
+                  {firstName} {lastName}
                 </Text>
               </View>
-            </Pressable>
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Contact Number</Text>
+              <View style={styles.valueBox}>
+                <Text style={styles.valueText}>{contactNumber}</Text>
+              </View>
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.valueBox}>
+                <Text style={styles.valueText}>{email}</Text>
+              </View>
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Registered Role</Text>
+              <View style={styles.roleBox}>
+                <Text style={styles.roleText}>{role}</Text>
+              </View>
+            </View>
+
+            <View style={styles.idContainer}>
+              <Text style={styles.label}>Scanned ID</Text>
+              {photo ? (
+                <View style={styles.imageWrapper}>
+                  <Image
+                    source={{ uri: photo as string }}
+                    style={styles.image}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <Text style={styles.noImageText}>No ID photo provided.</Text>
+              )}
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                onPress={handleConfirm}
+                style={styles.confirmButton}
+              >
+                <Text style={styles.confirmText}>Confirm & Submit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.backButton}
+              >
+                <Text style={styles.backText}>Go Back & Edit</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </View>
       </SafeAreaView>
-
-      <IDScannerModal
-        visible={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onCapture={(capturedUri) => setPhoto(capturedUri)}
-      />
     </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  gradientBackground: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+    alignItems: "center",
+  },
+  card: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 24,
+    width: "85%",
+    marginVertical: 20,
+    padding: 24,
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
+  title: {
+    fontWeight: "bold",
+    fontSize: 24,
+    textAlign: "center",
+    marginBottom: 8,
+    color: "#1f2937",
+  },
+  subtitle: {
+    textAlign: "center",
+    color: "#6b7280",
+    marginBottom: 24,
+    fontSize: 14,
+  },
+  fieldContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    color: "#6b7280",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 6,
+    fontWeight: "bold",
+  },
+  valueBox: {
+    backgroundColor: "#f9fafb",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f3f4f6",
+  },
+  valueText: {
+    color: "#1f2937",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  roleBox: {
+    backgroundColor: "#eff6ff",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#dbeafe",
+  },
+  roleText: {
+    color: "#2563eb",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  idContainer: {
+    marginBottom: 32,
+  },
+  imageWrapper: {
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#f9fafb",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 192,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  noImageText: {
+    color: "#ef4444",
+    fontStyle: "italic",
+    marginTop: 8,
+  },
+  actionsContainer: {
+    marginTop: "auto",
+    gap: 12,
+  },
+  confirmButton: {
+    backgroundColor: "#10b981",
+    borderRadius: 12,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  confirmText: {
+    color: "#ffffff",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  backButton: {
+    backgroundColor: "#e5e7eb",
+    borderRadius: 12,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backText: {
+    color: "#374151",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+});

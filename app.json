@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "bantaybayan_app",
-    "slug": "bantaybayan_app",
+    "name": "BantayBayan",
+    "slug": "bantaybayan",
     "version": "1.0.0",
+    "jsEngine": "jsc",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bantaybayanapp",
@@ -39,11 +40,12 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }

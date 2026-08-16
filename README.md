@@ -1,1 +1,1 @@
-tHIS IS AN EMERGENCY APP
+Right now, our Superadmin module focuses on core multi-tenant user provisioning (managing Admins, Responders, and Citizens) and global system telemetry like report resolution rates. 

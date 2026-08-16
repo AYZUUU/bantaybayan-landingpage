@@ -32,13 +32,21 @@ export const sendReport = async (report: {
     } as any);
   }
 
-  const res = await fetch(`${BASE_URL}/reports.php`, {
-    method: "POST",
-    body: formData,
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  try {
+    const res = await fetch(`${BASE_URL}/reports.php`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        Accept: "application/json",
+      },
+    });
 
-  return res.json();
+    const rawText = await res.text();
+    console.log("🚨 RAW SERVER RESPONSE FROM PHP:", rawText);
+
+    return JSON.parse(rawText);
+  } catch (error) {
+    console.error("sendReport Network or Parse Error:", error);
+    throw error;
+  }
 };

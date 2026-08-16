@@ -10,12 +10,13 @@ export interface Report {
   latitude?: number;
   longitude?: number;
   description?: string;
-  created_at?: string; // Optional: If your DB sends a timestamp
+  created_at?: string; 
+
 }
 
 interface RescuerCardProps {
   recentReports: Report[];
-  // 1. ADD THIS PROP so the card can talk to the main screen
+
   onViewDetails?: (report: Report) => void; 
 }
 

@@ -4,7 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -34,16 +35,22 @@ const IDScannerModal: React.FC<IDScannerModalProps> = ({
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<any>(null);
 
   const [capturing, setCapturing] = useState(false);
   const [enableTorch, setEnableTorch] = useState(false);
 
   useEffect(() => {
-    if (visible && !permission?.granted) {
+    if (visible && permission && !permission.granted) {
       requestPermission();
     }
   }, [visible, permission]);
+
+  useEffect(() => {
+    if (visible && mediaPermission && !mediaPermission.granted) {
+      requestMediaPermission();
+    }
+  }, [visible, mediaPermission]);
 
   const handleTakePicture = async () => {
     if (cameraRef.current && !capturing) {
@@ -155,20 +162,32 @@ export default function Signup() {
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(null);
-  const [items, setItems] = useState([
-    { label: "Citizen", value: "Citizen" },
-    { label: "Responder", value: "Responder" },
-  ]);
-
   const handleExportPhoto = async () => {
-    if (!photo) return;
-    const isAvailable = await Sharing.isAvailableAsync();
-    if (isAvailable) {
-      await Sharing.shareAsync(photo);
-    } else {
-      Toast.show({ type: "info", text1: "Sharing not supported on this device" });
+    if (!photo) {
+      Toast.show({ type: "info", text1: "No ID photo to share." });
+      return;
+    }
+
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Toast.show({ type: "info", text1: "Sharing not supported on this device" });
+        return;
+      }
+
+      let shareUri = photo;
+      if (!shareUri.startsWith("file://")) {
+        shareUri = "file://" + shareUri;
+      }
+
+      await Sharing.shareAsync(shareUri, {
+        mimeType: "image/jpeg",
+        dialogTitle: "Share Scanned ID",
+        UTI: "public.image",
+      });
+    } catch (error) {
+      console.error("Failed to share photo:", error);
+      Toast.show({ type: "error", text1: "Could not export/share the ID image." });
     }
   };
 
@@ -179,23 +198,21 @@ export default function Signup() {
       !contactNumber ||
       !email ||
       !password ||
-      !value ||
       !photo
     ) {
       Toast.show({ type: "info", text1: "Please complete all fields" });
       return;
     }
 
-    // Pass signup details directly to preview.tsx
     router.push({
-      pathname: "/preview",
+      pathname: "./preview",
       params: {
         firstName,
         lastName,
         contactNumber,
         email,
         password,
-        role: value,
+        role: "Citizen",
         photo,
       },
     });
@@ -203,135 +220,129 @@ export default function Signup() {
 
   return (
     <LinearGradient colors={["#ffffff", "#4D8BE2"]} style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.cardContainer}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardAvoidingView}
+        >
           <ScrollView
+            contentContainerStyle={styles.scrollContainer}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <Image
-              source={require("../assets/images/bantaybayan.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.titleText}>Create Account</Text>
+            <View style={styles.cardContainer}>
+              <Image
+                source={require("../assets/images/bantaybayan.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.titleText}>Create Account</Text>
 
-            {/* Input Fields */}
-            <TextInput
-              placeholder="First Name"
-              placeholderTextColor="#9CA3AF"
-              style={styles.textInput}
-              value={firstName}
-              onChangeText={setFirstName}
-            />
-            <TextInput
-              placeholder="Last Name"
-              placeholderTextColor="#9CA3AF"
-              style={styles.textInput}
-              value={lastName}
-              onChangeText={setLastName}
-            />
-            <TextInput
-              placeholder="Contact Number (e.g. 09123456789)"
-              placeholderTextColor="#9CA3AF"
-              style={styles.textInput}
-              value={contactNumber}
-              onChangeText={setContactNumber}
-              keyboardType="phone-pad"
-            />
-            <TextInput
-              placeholder="Email"
-              placeholderTextColor="#9CA3AF"
-              style={styles.textInput}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              placeholder="Password"
-              placeholderTextColor="#9CA3AF"
-              style={styles.textInput}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+              {/* --- ID SCANNER COMPONENT --- */}
+              <Pressable
+                onPress={() => {
+                  if (photo) {
+                    pickSource(setPhoto);
+                  } else {
+                    setIsScannerOpen(true);
+                  }
+                }}
+                style={[
+                  styles.photoBox,
+                  !photo && styles.photoBoxDashed,
+                  { marginBottom: 16 },
+                ]}
+              >
+                {photo ? (
+                  <Image
+                    source={{ uri: photo }}
+                    style={styles.previewImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Text style={styles.photoPlaceholderText}>
+                      Tap to Scan ID
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
 
-            {/* Role Dropdown */}
-            <DropDownPicker
-              style={styles.dropdown}
-              open={open}
-              value={value}
-              items={items}
-              setOpen={setOpen}
-              setValue={setValue}
-              setItems={setItems}
-              placeholder="Select role"
-              zIndex={1000}
-              zIndexInverse={3000}
-              dropDownDirection="BOTTOM"
-              listMode="SCROLLVIEW"
-            />
+              {/* External Options for Captured Photo */}
+              {photo && (
+                <View style={[styles.photoActionRow, { marginBottom: 16 }]}>
+                  <TouchableOpacity onPress={handleExportPhoto}>
+                    <Text style={styles.shareText}>Share ID</Text>
+                  </TouchableOpacity>
 
-            {/* Photo Capture Preview Area */}
-            <Pressable
-              onPress={() => {
-                if (photo) {
-                  pickSource(setPhoto);
-                } else {
-                  setIsScannerOpen(true);
-                }
-              }}
-              style={[
-                styles.photoBox,
-                !photo && styles.photoBoxDashed,
-              ]}
-            >
-              {photo ? (
-                <Image
-                  source={{ uri: photo }}
-                  style={styles.previewImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.photoPlaceholder}>
-                  <Text style={styles.photoPlaceholderText}>
-                    Tap to Scan ID
-                  </Text>
+                  <TouchableOpacity onPress={() => setIsScannerOpen(true)}>
+                    <Text style={styles.rescanText}>Rescan ID</Text>
+                  </TouchableOpacity>
                 </View>
               )}
-            </Pressable>
 
-            {/* External Options for Captured Photo */}
-            {photo && (
-              <View style={styles.photoActionRow}>
-                <TouchableOpacity onPress={handleExportPhoto}>
-                  <Text style={styles.shareText}>📤 Share ID</Text>
-                </TouchableOpacity>
+              {/* Input Fields */}
+              <TextInput
+                placeholder="First Name"
+                placeholderTextColor="#9CA3AF"
+                style={styles.textInput}
+                value={firstName}
+                onChangeText={setFirstName}
+              />
+              <TextInput
+                placeholder="Last Name"
+                placeholderTextColor="#9CA3AF"
+                style={styles.textInput}
+                value={lastName}
+                onChangeText={setLastName}
+              />
+              <TextInput
+                placeholder="Contact Number (e.g. 09123456789)"
+                placeholderTextColor="#9CA3AF"
+                style={styles.textInput}
+                value={contactNumber}
+                onChangeText={setContactNumber}
+                keyboardType="phone-pad"
+              />
+              <TextInput
+                placeholder="Email"
+                placeholderTextColor="#9CA3AF"
+                style={styles.textInput}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TextInput
+                placeholder="Password"
+                placeholderTextColor="#9CA3AF"
+                style={styles.textInput}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
 
-                <TouchableOpacity onPress={() => setIsScannerOpen(true)}>
-                  <Text style={styles.rescanText}>📷 Rescan ID</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Navigation to Preview Screen */}
-            <Pressable
-              onPress={handleGoToPreview}
-              style={styles.previewButtonContainer}
-            >
-              <View style={styles.previewButton}>
-                <Text style={styles.previewButtonText}>Signup</Text>
-              </View>
-            </Pressable>
+              {/* Navigation to Preview Screen */}
+              <Pressable
+                onPress={handleGoToPreview}
+                style={styles.previewButtonContainer}
+              >
+                <View style={styles.previewButton}>
+                  <Text style={styles.previewButtonText}>Signup</Text>
+                </View>
+              </Pressable>
+            </View>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
 
       <IDScannerModal
         visible={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
-        onCapture={(capturedUri) => setPhoto(capturedUri)}
+        onCapture={(capturedUri) => {
+          setPhoto(capturedUri);
+          Toast.show({ type: "success", text1: "ID captured successfully!" });
+        }}
       />
     </LinearGradient>
   );
@@ -343,46 +354,49 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    width: "100%",
+  },
+  scrollContainer: {
+    flexGrow: 1,
     alignItems: "center",
-    marginTop: 20,
+    justifyContent: "center",
+    paddingVertical: 20,
   },
   cardContainer: {
-    height: "auto",
     backgroundColor: "#ffffff",
     borderRadius: 24,
-    width: "83.33%",
-    marginBottom: 4,
+    width: "88%",
     padding: 24,
-    zIndex: 10,
-    elevation: 5,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
   logo: {
-    width: 224,
-    height: 224,
+    width: 140,
+    height: 140,
     alignSelf: "center",
+    marginBottom: 8,
   },
   titleText: {
     fontWeight: "bold",
-    fontSize: 18,
+    fontSize: 20,
     textAlign: "center",
     marginBottom: 16,
     color: "#1F2937",
   },
   textInput: {
-    borderRadius: 6,
+    borderRadius: 8,
     backgroundColor: "#F3F4F6",
-    height: 40,
+    height: 44,
     marginBottom: 16,
     paddingHorizontal: 12,
     color: "#1F2937",
-  },
-  dropdown: {
-    borderRadius: 7,
-    marginBottom: 16,
+    borderWidth: 1,
     borderColor: "#E5E7EB",
   },
   photoBox: {
@@ -391,6 +405,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     height: 120,
+    backgroundColor: "#F3F4F6",
   },
   photoBoxDashed: {
     borderWidth: 2,
@@ -412,26 +427,27 @@ const styles = StyleSheet.create({
   photoActionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    marginTop: 4,
   },
   shareText: {
     color: "#2563EB",
     fontWeight: "600",
+    fontSize: 16,
   },
   rescanText: {
     color: "#EF4444",
     fontWeight: "600",
+    fontSize: 16,
   },
   previewButtonContainer: {
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 10,
   },
   previewButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#2A4C7C",
     borderRadius: 12,
-    width: "75%",
+    width: "100%",
     height: 48,
     justifyContent: "center",
     alignItems: "center",

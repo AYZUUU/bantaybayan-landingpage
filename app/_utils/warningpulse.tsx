@@ -1,11 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Animated, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 export default function WarningPulse() {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0.7)).current;
-
-  const report = useState();
 
   useEffect(() => {
     const anim = Animated.loop(
@@ -42,14 +40,52 @@ export default function WarningPulse() {
   }, [scale, opacity]);
 
   return (
-    <View className="w-32 h-32 items-center justify-center mb-4">
+    <View style={styles.container}>
       <Animated.View
-        className="absolute w-32 h-32 rounded-full border-4 border-red-500"
-        style={{ transform: [{ scale }], opacity }}
+        style={[
+          styles.pulseRing,
+          { transform: [{ scale }], opacity },
+        ]}
       />
-      <View className="w-16 h-16 rounded-full bg-red-500 items-center justify-center shadow-lg">
-        <Text className="text-white text-4xl font-black">!</Text>
+      <View style={styles.centerButton}>
+        <Text style={styles.buttonText}>!</Text>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    width: 128,
+    height: 128,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  pulseRing: {
+    position: "absolute",
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    borderWidth: 4,
+    borderColor: "#EF4444",
+  },
+  centerButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 36,
+    fontWeight: "900",
+  },
+});
