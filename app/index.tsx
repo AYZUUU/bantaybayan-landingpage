@@ -73,8 +73,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImage: {
-    width: 300, // w-56
-    height: 300, // h-56
+    width: 300,
+    height: 300,
   },
   welcomeText: {
     color: "#FFFFFF", // primary

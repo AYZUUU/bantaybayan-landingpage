@@ -15,12 +15,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
-import { pickSource } from "./_utils/imagepicker";
+import { Ionicons } from "@expo/vector-icons";
+import { saveRegistrationDraft } from "../shared/registrationDraft";
 
 interface IDScannerModalProps {
   visible: boolean;
@@ -34,23 +35,16 @@ const IDScannerModal: React.FC<IDScannerModalProps> = ({
   onCapture,
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
-  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
   const cameraRef = useRef<any>(null);
 
   const [capturing, setCapturing] = useState(false);
   const [enableTorch, setEnableTorch] = useState(false);
 
   useEffect(() => {
-    if (visible && permission && !permission.granted) {
+    if (visible && permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
-  }, [visible, permission]);
-
-  useEffect(() => {
-    if (visible && mediaPermission && !mediaPermission.granted) {
-      requestMediaPermission();
-    }
-  }, [visible, mediaPermission]);
+  }, [permission, requestPermission, visible]);
 
   const handleTakePicture = async () => {
     if (cameraRef.current && !capturing) {
@@ -62,18 +56,6 @@ const IDScannerModal: React.FC<IDScannerModalProps> = ({
         });
 
         if (photo?.uri) {
-          try {
-            let perm = mediaPermission;
-            if (!perm?.granted) {
-              perm = await requestMediaPermission();
-            }
-            if (perm?.granted) {
-              await MediaLibrary.createAssetAsync(photo.uri);
-            }
-          } catch (e) {
-            console.log("Failed to save asset to gallery:", e);
-          }
-
           onCapture(photo.uri);
           onClose();
         }
@@ -86,38 +68,35 @@ const IDScannerModal: React.FC<IDScannerModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
       <View style={styles.modalContainer}>
         {permission?.granted ? (
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            enableTorch={enableTorch}
-          >
-            <SafeAreaView style={styles.overlayContainer}>
+          <View style={StyleSheet.absoluteFill}>
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              enableTorch={enableTorch}
+            />
+
+            <SafeAreaView style={styles.overlayAbsolute} pointerEvents="box-none">
               {/* Header Controls */}
               <View style={styles.header}>
                 <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-                  <Text style={styles.btnText}>✕ Cancel</Text>
+                  <Text style={styles.btnText}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setEnableTorch((prev) => !prev)}
                   style={styles.headerButton}
                 >
-                  <Text style={styles.btnText}>
-                    {enableTorch ? "🔦 Flash ON" : "⚡ Flash OFF"}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name={enableTorch ? "flash" : "flash-off"} size={20} color="#ffffff" />
+                    <Text style={styles.btnText}>
+                      {enableTorch ? "Flash ON" : "Flash OFF"}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
-              </View>
-
-              {/* ID Card Target Alignment Frame */}
-              <View style={styles.frameContainer}>
-                <View style={styles.idCardGuide} />
-                <Text style={styles.instructionText}>
-                  Position the ID card inside the frame
-                </Text>
               </View>
 
               {/* Shutter Button Footer */}
@@ -135,13 +114,21 @@ const IDScannerModal: React.FC<IDScannerModalProps> = ({
                 </TouchableOpacity>
               </View>
             </SafeAreaView>
-          </CameraView>
+          </View>
         ) : (
           <SafeAreaView style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#ffffff" />
-            <Text style={styles.loadingText}>
-              Requesting Camera Permission...
-            </Text>
+            {permission && !permission.canAskAgain && !permission.granted ? (
+              <Text style={styles.loadingText}>
+                Camera access denied. Please enable in Settings.
+              </Text>
+            ) : (
+              <>
+                <ActivityIndicator size="large" color="#ffffff" />
+                <Text style={styles.loadingText}>
+                  Requesting Camera Permission
+                </Text>
+              </>
+            )}
             <TouchableOpacity onPress={onClose} style={{ marginTop: 20 }}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -161,76 +148,78 @@ export default function Signup() {
   const [photo, setPhoto] = useState<string | null>(null);
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isOpeningPreview, setIsOpeningPreview] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(null);
+  const [items, setItems] = useState([
+    { label: "Citizen", value: "Citizen" },
+    { label: "Responder", value: "Responder" },
+  ]);
 
   const handleExportPhoto = async () => {
-    if (!photo) {
-      Toast.show({ type: "info", text1: "No ID photo to share." });
-      return;
-    }
-
-    try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Toast.show({ type: "info", text1: "Sharing not supported on this device" });
-        return;
-      }
-
-      let shareUri = photo;
-      if (!shareUri.startsWith("file://")) {
-        shareUri = "file://" + shareUri;
-      }
-
-      await Sharing.shareAsync(shareUri, {
-        mimeType: "image/jpeg",
-        dialogTitle: "Share Scanned ID",
-        UTI: "public.image",
-      });
-    } catch (error) {
-      console.error("Failed to share photo:", error);
-      Toast.show({ type: "error", text1: "Could not export/share the ID image." });
+    if (!photo) return;
+    const isAvailable = await Sharing.isAvailableAsync();
+    if (isAvailable) {
+      await Sharing.shareAsync(photo);
+    } else {
+      Toast.show({ type: "info", text1: "Sharing not supported on this device" });
     }
   };
 
-  const handleGoToPreview = () => {
+  const handleGoToPreview = async () => {
+    if (isOpeningPreview) return;
     if (
       !firstName ||
       !lastName ||
       !contactNumber ||
       !email ||
       !password ||
+      !value ||
       !photo
     ) {
       Toast.show({ type: "info", text1: "Please complete all fields" });
       return;
     }
 
-    router.push({
-      pathname: "./preview",
-      params: {
+    setIsOpeningPreview(true);
+    try {
+      const draftId = await saveRegistrationDraft({
         firstName,
         lastName,
         contactNumber,
         email,
         password,
-        role: "Citizen",
-        photo,
-      },
-    });
+        role: value,
+        photoUri: photo,
+      });
+      router.push({ pathname: "/preview", params: { draftId } });
+    } catch (error) {
+      console.error("Could not save signup details:", error);
+      Toast.show({
+        type: "error",
+        text1: "Could not continue",
+        text2: "Your signup details could not be saved. Please try again.",
+      });
+    } finally {
+      setIsOpeningPreview(false);
+    }
   };
 
   return (
     <LinearGradient colors={["#ffffff", "#4D8BE2"]} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.keyboardAvoidingView}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.cardContainer}>
+          <View style={styles.cardContainer}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.scrollContent}
+            >
               <Image
                 source={require("../assets/images/bantaybayan.png")}
                 style={styles.logo}
@@ -238,11 +227,11 @@ export default function Signup() {
               />
               <Text style={styles.titleText}>Create Account</Text>
 
-              {/* --- ID SCANNER COMPONENT --- */}
+              {/* ID Scanner Box Placed Above Inputs */}
               <Pressable
                 onPress={() => {
                   if (photo) {
-                    pickSource(setPhoto);
+                    setIsPreviewModalOpen(true);
                   } else {
                     setIsScannerOpen(true);
                   }
@@ -254,16 +243,20 @@ export default function Signup() {
                 ]}
               >
                 {photo ? (
-                  <Image
-                    source={{ uri: photo }}
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                  />
+                  <View style={styles.previewContainer}>
+                    <Image
+                      source={{ uri: photo }}
+                      style={styles.previewImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.viewOverlay}>
+                      <Text style={styles.viewOverlayText}>Click to view</Text>
+                    </View>
+                  </View>
                 ) : (
                   <View style={styles.photoPlaceholder}>
-                    <Text style={styles.photoPlaceholderText}>
-                      Tap to Scan ID
-                    </Text>
+                    <Ionicons name="camera-outline" size={28} color="#6B7280" style={{ marginBottom: 4 }} />
+                    <Text style={styles.photoPlaceholderText}>Tap to Scan ID</Text>
                   </View>
                 )}
               </Pressable>
@@ -271,11 +264,13 @@ export default function Signup() {
               {/* External Options for Captured Photo */}
               {photo && (
                 <View style={[styles.photoActionRow, { marginBottom: 16 }]}>
-                  <TouchableOpacity onPress={handleExportPhoto}>
+                  <TouchableOpacity onPress={handleExportPhoto} style={styles.actionButton}>
+                    <Ionicons color="#2563EB" name="share-outline" size={18} />
                     <Text style={styles.shareText}>Share ID</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => setIsScannerOpen(true)}>
+                  <TouchableOpacity onPress={() => setIsScannerOpen(true)} style={styles.actionButton}>
+                    <Ionicons color="#EF4444" name="scan-outline" size={18} />
                     <Text style={styles.rescanText}>Rescan ID</Text>
                   </TouchableOpacity>
                 </View>
@@ -322,28 +317,68 @@ export default function Signup() {
                 secureTextEntry
               />
 
+              {/* Role Dropdown */}
+              <DropDownPicker
+                style={styles.dropdown}
+                open={open}
+                value={value}
+                items={items}
+                setOpen={setOpen}
+                setValue={setValue}
+                setItems={setItems}
+                placeholder="Select role"
+                zIndex={1000}
+                zIndexInverse={3000}
+                dropDownDirection="BOTTOM"
+                listMode="SCROLLVIEW"
+              />
+
               {/* Navigation to Preview Screen */}
               <Pressable
                 onPress={handleGoToPreview}
+                disabled={isOpeningPreview}
                 style={styles.previewButtonContainer}
               >
                 <View style={styles.previewButton}>
-                  <Text style={styles.previewButtonText}>Signup</Text>
+                  {isOpeningPreview ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.previewButtonText}>Signup</Text>
+                  )}
                 </View>
               </Pressable>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
 
       <IDScannerModal
         visible={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
-        onCapture={(capturedUri) => {
-          setPhoto(capturedUri);
-          Toast.show({ type: "success", text1: "ID captured successfully!" });
-        }}
+        onCapture={(capturedUri) => setPhoto(capturedUri)}
       />
+
+      {/* Full Screen ID Preview Modal */}
+      <Modal visible={isPreviewModalOpen} transparent={true} animationType="fade">
+        <View style={styles.fullscreenModalContainer}>
+          <View style={styles.fullscreenModalContent}>
+            <TouchableOpacity
+              onPress={() => setIsPreviewModalOpen(false)}
+              style={styles.closeModalButton}
+            >
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Scanned ID Preview</Text>
+            {photo && (
+              <Image
+                source={{ uri: photo }}
+                style={styles.fullscreenImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -358,45 +393,51 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
     width: "100%",
-  },
-  scrollContainer: {
-    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 20,
   },
   cardContainer: {
+    flex: 1,
     backgroundColor: "#ffffff",
     borderRadius: 24,
     width: "88%",
-    padding: 24,
-    elevation: 8,
+    maxHeight: "90%",
+    marginVertical: 20,
+    padding: 20,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   logo: {
-    width: 140,
-    height: 140,
+    width: 100,
+    height: 100,
     alignSelf: "center",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   titleText: {
     fontWeight: "bold",
-    fontSize: 20,
+    fontSize: 18,
     textAlign: "center",
     marginBottom: 16,
     color: "#1F2937",
   },
   textInput: {
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: "#F3F4F6",
-    height: 44,
+    height: 40,
     marginBottom: 16,
     paddingHorizontal: 12,
     color: "#1F2937",
-    borderWidth: 1,
+  },
+  dropdown: {
+    borderRadius: 7,
+    marginBottom: 16,
     borderColor: "#E5E7EB",
   },
   photoBox: {
@@ -412,10 +453,30 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
     borderColor: "#9CA3AF",
   },
+  previewContainer: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
   previewImage: {
     width: "100%",
     height: "100%",
     borderRadius: 12,
+  },
+  viewOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewOverlayText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
   },
   photoPlaceholder: {
     alignItems: "center",
@@ -429,23 +490,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 4,
   },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   shareText: {
     color: "#2563EB",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: 15,
   },
   rescanText: {
     color: "#EF4444",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: 15,
   },
   previewButtonContainer: {
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
+    gap: 8,
   },
   previewButton: {
-    backgroundColor: "#2A4C7C",
+    backgroundColor: "#2563EB",
     borderRadius: 12,
     width: "100%",
     height: 48,
@@ -476,10 +543,6 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
     fontWeight: "bold",
   },
-  overlayContainer: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -497,31 +560,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontWeight: "600",
     fontSize: 14,
-  },
-  frameContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  idCardGuide: {
-    width: "90%",
-    aspectRatio: 1.586,
-    borderWidth: 2,
-    borderColor: "#10B981",
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-  },
-  instructionText: {
-    color: "#ffffff",
-    marginTop: 16,
-    fontSize: 14,
-    fontWeight: "500",
-    textAlign: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: "hidden",
   },
   footer: {
     alignItems: "center",
@@ -542,5 +580,44 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: "#ffffff",
+  },
+  overlayAbsolute: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+  fullscreenModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  fullscreenModalContent: {
+    width: "100%",
+    height: "70%",
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeModalButton: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    zIndex: 10,
+    padding: 5,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#1F2937",
+  },
+  fullscreenImage: {
+    width: "100%",
+    height: "85%",
+    borderRadius: 12,
   },
 });

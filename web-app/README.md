@@ -1,73 +1,58 @@
-# React + TypeScript + Vite
+# BantayBayan Web Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Configuration
 
-Currently, two official plugins are available:
+Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_WEB_PUSH_PUBLIC_KEY`. Only public
+keys belong in this browser application. Never put a Supabase
+secret/service-role or VAPID private key in the dashboard.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The schema, migrations, and Edge Function deployment steps are documented in
+the repository's [Supabase migration guide](../README.md#supabase-migration).
+Admin sign-in, user management, incidents, reports, and settings use Supabase;
+admin provisioning requires the deployed `manage-users` Edge Function.
+Background browser notifications also require the deployed
+`notify-report-event` function, the web push subscription migration, and
+matching VAPID public/private keys. See the repository's Supabase migration
+guide for configuration steps.
 
-## React Compiler
+## Development and production build
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+npm run dev
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The production build is written to `dist`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Pages
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `/` redirects to the administrator sign-in page.
+- `/admin` is the administrator sign-in page; dashboard routes require an
+  authenticated administrator session and MFA.
+
+When deploying, configure the host to serve `index.html` for client-side routes
+such as `/admin` and `/dashboard`.
+
+## Admin dashboard deployment
+
+The admin dashboard is a separate Vercel project with the project root set to
+`web-app`. Use `npm run build` as the build command and `dist` as the output
+directory. The included `vercel.json` provides the client-side route fallback.
+
+The public landing page is a separate app in [`landing-site`](./landing-site/).
+Deploy it as a different Vercel project; its setup and environment variables
+are documented in that app's README.
+
+## Map tiles
+
+The dashboard defaults to OpenStreetMap tiles and includes required
+attribution. The public OpenStreetMap tile server is intended for limited use,
+not high-volume production. Before a production deployment, configure `VITE_OSM_TILE_URL` to
+a tile provider whose terms and capacity fit the app, and set
+`VITE_MAP_TILE_ATTRIBUTION` to that provider's required attribution. The tile
+URL and attribution must belong to the same provider.
+
+The admin dashboard includes locally bundled Ilocos Sur municipality
+boundaries from geoBoundaries (NAMRIA, PSA, and OCHA Philippines; CC BY 3.0
+IGO) for map highlighting.

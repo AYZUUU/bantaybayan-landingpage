@@ -13,6 +13,8 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "nativewind-env.d.ts"
-, "app/_utils/imagecapture.tsx"  ]
+    "nativewind-env.d.ts",
+    "app/_utils/imagecapture.tsx"
+  ],
+  "exclude": ["supabase/functions"]
 }

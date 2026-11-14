@@ -3,12 +3,10 @@
     "name": "BantayBayan",
     "slug": "bantaybayan",
     "version": "1.0.0",
-    "jsEngine": "jsc",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bantaybayanapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -19,8 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ayzu.bantaybayan"
     },
     "web": {
       "output": "static",
@@ -41,11 +39,27 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow BantayBayan to access your photos so you can choose a profile picture."
+        }
+      ],
+      "expo-image",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "79d170db-4a73-4f5e-971d-ea2cdea2cb79"
+      }
+    },
+    "owner": "ayzu"
   }
 }

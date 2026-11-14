@@ -1,16 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 
-export default function WarningPulse() {
-  const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(0.7)).current;
+export default function WarningPulse({ size = 128 }: { size?: number }) {
+  const [scale] = useState(() => new Animated.Value(1));
+  const [opacity] = useState(() => new Animated.Value(0.7));
+  const centerSize = size * 0.52;
+  const maximumScale = size <= 80 ? 1.2 : 1.5;
 
   useEffect(() => {
     const anim = Animated.loop(
       Animated.parallel([
         Animated.sequence([
           Animated.timing(scale, {
-            toValue: 1.5,
+            toValue: maximumScale,
             duration: 800,
             useNativeDriver: true,
           }),
@@ -37,18 +39,34 @@ export default function WarningPulse() {
 
     anim.start();
     return () => anim.stop();
-  }, [scale, opacity]);
+  }, [maximumScale, scale, opacity]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width: size, height: size }]}>
       <Animated.View
         style={[
           styles.pulseRing,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+          },
           { transform: [{ scale }], opacity },
         ]}
       />
-      <View style={styles.centerButton}>
-        <Text style={styles.buttonText}>!</Text>
+      <View
+        style={[
+          styles.centerButton,
+          {
+            width: centerSize,
+            height: centerSize,
+            borderRadius: centerSize / 2,
+          },
+        ]}
+      >
+        <Text style={[styles.buttonText, { fontSize: centerSize * 0.58 }]}>
+          !
+        </Text>
       </View>
     </View>
   );
@@ -56,24 +74,17 @@ export default function WarningPulse() {
 
 const styles = StyleSheet.create({
   container: {
-    width: 128,
-    height: 128,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
   },
   pulseRing: {
     position: "absolute",
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    borderWidth: 4,
+    top: 0,
+    left: 0,
+    borderWidth: 3,
     borderColor: "#EF4444",
   },
   centerButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
     backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
@@ -85,7 +96,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: 36,
     fontWeight: "900",
   },
 });

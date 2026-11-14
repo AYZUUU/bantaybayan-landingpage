@@ -1,0 +1,8 @@
+[functions.register-user]
+verify_jwt = false
+
+[functions.submit-quick-report]
+verify_jwt = false
+
+[functions.receive-sms-report]
+verify_jwt = false

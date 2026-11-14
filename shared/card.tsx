@@ -64,7 +64,7 @@ export default function Card({ userReports }: CardProps) {
           ) : (
            
             <Text className="text-gray-500 italic text-center py-2">
-              You haven't submitted any reports yet.
+              You haven&apos;t submitted any reports yet.
             </Text>
           )}
 

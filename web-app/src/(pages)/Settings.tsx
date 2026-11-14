@@ -1,92 +1,474 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { LuBell, LuLock, LuMoon, LuUser } from "react-icons/lu";
+import {
+  LuUser,
+  LuLock,
+  LuBell,
+  LuPalette,
+  LuEye,
+  LuEyeOff,
+} from "react-icons/lu";
+
+import AvatarCustomizer from "../components/AvatarCustomizer";
+import { supabase } from "../utils/supabase";
+import {
+  getVerifiedTotpFactor,
+  removeTotpFactor,
+  startTotpEnrollment,
+  verifyNewTotpFactor,
+} from "../../../shared/totpMfa";
+
+type Tab = "profile" | "security" | "notifications" | "preferences";
+const WEB_PUSH_PUBLIC_KEY = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY?.trim();
+
+function decodeVapidPublicKey(value: string) {
+  const padded = value + "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(window.atob(base64), (character) =>
+    character.charCodeAt(0),
+  );
+}
 
 export default function Settings() {
+  const [activeTab, setActiveTab] = useState<Tab>("profile");
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [contactNumber, setContactNumber] = useState("");
+
+  // Store original fetched values to restore on 'Cancel'
+  const [savedProfile, setSavedProfile] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    contactNumber: "",
+  });
+
+  const [isEditing, setIsEditing] = useState(false);
+
+  const [avatarData, setAvatarData] = useState<{
+    file: File | null;
+    url: string | null;
+  }>({ file: null, url: null });
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null);
+  const [savedAvatarPath, setSavedAvatarPath] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  });
+  const [totpFactorId, setTotpFactorId] = useState<string | null>(null);
+  const [totpEnrollment, setTotpEnrollment] = useState<{
+    factorId: string;
+    qrCode: string;
+    secret: string;
+  } | null>(null);
+  const [totpCode, setTotpCode] = useState("");
+  const [isTotpBusy, setIsTotpBusy] = useState(false);
 
-  const [soundAlerts, setSoundAlerts] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  const [pushNotifications, setPushNotifications] = useState(
+    false,
+  );
+  const [isPushBusy, setIsPushBusy] = useState(false);
+  const [soundAlerts, setSoundAlerts] = useState(
+    () => localStorage.getItem("soundAlerts") === "true",
+  );
 
-  // 1. Load user profile and preferences on component mount
-  useEffect(() => {
-    const userId = localStorage.getItem("userId");
-    
-    // Load local preferences
-    const savedSound = localStorage.getItem("soundAlerts");
-    if (savedSound !== null) setSoundAlerts(savedSound === "true");
+  const [theme, setTheme] = useState<"light" | "dark" | "system">(() => {
+    const savedTheme = localStorage.getItem("theme");
+    return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "system";
+  });
 
-    const savedDarkMode = localStorage.getItem("darkMode");
-    if (savedDarkMode !== null) setDarkMode(savedDarkMode === "true");
+  const handleThemeChange = (value: "light" | "dark" | "system") => {
+    setTheme(value);
+    localStorage.setItem("theme", value);
+    window.dispatchEvent(
+      new CustomEvent("bantaybayan-theme-change", { detail: value }),
+    );
+  };
 
-    if (!userId) return;
+  const handlePushNotificationsChange = async (enabled: boolean) => {
+    if (isPushBusy) return;
+    setIsPushBusy(true);
 
-    // Fetch user details to pre-populate inputs
-    fetch(`http://localhost/api/getUserProfile.php?id=${userId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.status === "success" && data.user) {
-          setFirstName(data.user.first_name || "");
-          setLastName(data.user.last_name || "");
-          setContactNumber(data.user.contact_number || "");
-        }
-      })
-      .catch((err) => console.error("Failed to load profile details:", err));
-  }, []);
-
-  // 2. Handle Profile Update
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const toastId = toast.loading("Saving profile...");
-
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
-      toast.error("User ID not found. Please log in again.", { id: toastId });
-      return;
-    }
-    
     try {
-      const response = await fetch("http://localhost/api/updateProfile.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: userId,
-          first_name: firstName,
-          last_name: lastName,
-          contact_number: contactNumber,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.status === "success") {
-        toast.success("Profile updated successfully!", { id: toastId });
-      } else {
-        toast.error(`Error: ${result.message}`, { id: toastId });
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        throw new Error("Sign in again before changing notification settings.");
       }
+
+      if (!enabled) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription =
+          await registration?.pushManager.getSubscription();
+        if (subscription) {
+          const { error } = await supabase
+            .from("web_push_subscriptions")
+            .delete()
+            .eq("user_id", userData.user.id)
+            .eq("endpoint", subscription.endpoint);
+          if (error) throw new Error(error.message);
+          await subscription.unsubscribe();
+        }
+        setPushNotifications(false);
+        localStorage.setItem("pushNotifications", "false");
+        return;
+      }
+
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("This browser does not support background push notifications.");
+      }
+      if (!WEB_PUSH_PUBLIC_KEY) {
+        throw new Error(
+          "Web push is not configured. Set VITE_WEB_PUSH_PUBLIC_KEY and the matching Supabase VAPID secrets.",
+        );
+      }
+      if (typeof Notification === "undefined") {
+        throw new Error("Browser notifications are not supported.");
+      }
+      const permission =
+        Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error("Allow notifications in your browser to enable alerts.");
+      }
+      await navigator.serviceWorker.register("/service-worker.js");
+        await navigator.serviceWorker.register("/service-worker.js");
+      const serviceWorker = await navigator.serviceWorker.ready;
+      if (!serviceWorker.active) {
+        throw new Error(
+          "The notification service worker could not be activated. Refresh the page and try again.",
+        );
+      }
+      const subscription = await serviceWorker.pushManager.getSubscription();
+      const activeSubscription =
+        subscription ??
+        (await serviceWorker.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeVapidPublicKey(WEB_PUSH_PUBLIC_KEY),
+        }));
+      const serialized = activeSubscription.toJSON();
+      const p256dh = serialized.keys?.p256dh;
+      const auth = serialized.keys?.auth;
+      if (!activeSubscription.endpoint || !p256dh || !auth) {
+        throw new Error("The browser returned an incomplete push subscription.");
+      }
+
+      const { error: saveError } = await supabase
+        .from("web_push_subscriptions")
+        .upsert(
+          {
+            user_id: userData.user.id,
+            endpoint: activeSubscription.endpoint,
+            p256dh,
+            auth,
+          },
+          { onConflict: "user_id,endpoint" },
+        );
+      if (saveError) {
+        await activeSubscription.unsubscribe();
+        throw new Error(saveError.message);
+      }
+      setPushNotifications(true);
+      localStorage.setItem("pushNotifications", "true");
+      toast.success("Background browser notifications enabled.");
     } catch (error) {
-      console.error("Profile update failed:", error);
-      toast.error("Network error. Could not connect to server.", { id: toastId });
+      console.error("Failed to enable browser notifications:", error);
+      const message =
+        error instanceof Error && error.name === "AbortError"
+          ? "Your browser's push service could not create a subscription. This can happen when the browser push provider is unavailable or blocks the request. Try Chrome or Edge, or check the browser's notification and network settings."
+          : error instanceof Error
+            ? error.message
+            : "Could not update browser push notifications.";
+      toast.error(
+        message,
+      );
+    } finally {
+      setIsPushBusy(false);
     }
   };
 
-  // 3. Handle Password Update
-  const handleUpdatePassword = async (e: React.FormEvent) => {
+  const handleSoundAlertsChange = (enabled: boolean) => {
+    setSoundAlerts(enabled);
+    localStorage.setItem("soundAlerts", String(enabled));
+  };
+
+  useEffect(() => {
+    let active = true;
+    void getVerifiedTotpFactor(supabase)
+      .then((factor) => {
+        if (active) setTotpFactorId(factor?.id ?? null);
+      })
+      .catch((error: unknown) => {
+        console.error("Could not load authenticator status:", error);
+        if (active) toast.error("Could not load authenticator status.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    void navigator.serviceWorker
+      .getRegistration()
+      .then((registration) => registration?.pushManager.getSubscription())
+      .then((subscription) => {
+        if (active) {
+          setPushNotifications(
+            Boolean(subscription) &&
+              typeof Notification !== "undefined" &&
+              Notification.permission === "granted",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Could not inspect browser push subscription:", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const beginTotpEnrollment = async () => {
+    setIsTotpBusy(true);
+    try {
+      setTotpEnrollment(
+        await startTotpEnrollment(supabase, "BantayBayan account"),
+      );
+      setTotpCode("");
+    } catch (error) {
+      console.error("Could not start authenticator setup:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Could not start authenticator setup.",
+      );
+    } finally {
+      setIsTotpBusy(false);
+    }
+  };
+
+  const confirmTotpEnrollment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!totpEnrollment || !/^\d{6}$/.test(totpCode.trim())) {
+      toast.error("Enter the current 6-digit authenticator code.");
+      return;
+    }
+    setIsTotpBusy(true);
+    try {
+      await verifyNewTotpFactor(
+        supabase,
+        totpEnrollment.factorId,
+        totpCode,
+      );
+      setTotpFactorId(totpEnrollment.factorId);
+      setTotpEnrollment(null);
+      setTotpCode("");
+      toast.success("Authenticator app enabled.");
+    } catch (error) {
+      console.error("Could not verify authenticator setup:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Could not verify the code.",
+      );
+    } finally {
+      setIsTotpBusy(false);
+    }
+  };
+
+  const disableTotp = async () => {
+    if (!totpFactorId) return;
+    setIsTotpBusy(true);
+    try {
+      await removeTotpFactor(supabase, totpFactorId);
+      setTotpFactorId(null);
+      toast.success("Authenticator app disabled.");
+    } catch (error) {
+      console.error("Could not disable authenticator:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not disable the authenticator.",
+      );
+    } finally {
+      setIsTotpBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
+
+    let active = true;
+    const loadProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("first_name, last_name, email, contact_number, avatar_path")
+          .eq("id", userId)
+          .single();
+        if (error) throw new Error(error.message);
+        if (active) {
+          const loadedProfile = {
+            firstName: data.first_name || "",
+            lastName: data.last_name || "",
+            email: data.email || "",
+            contactNumber: data.contact_number || "",
+          };
+
+          setFirstName(loadedProfile.firstName);
+          setLastName(loadedProfile.lastName);
+          setEmail(loadedProfile.email);
+          setNewEmail(loadedProfile.email);
+          setContactNumber(loadedProfile.contactNumber);
+          setSavedProfile(loadedProfile);
+
+          const loadedAvatarPath = data.avatar_path || null;
+          const loadedAvatarUrl = loadedAvatarPath
+            ? supabase.storage
+                .from("avatars")
+                .getPublicUrl(loadedAvatarPath).data.publicUrl
+            : null;
+          setSavedAvatarUrl(loadedAvatarUrl);
+          setSavedAvatarPath(loadedAvatarPath);
+          setAvatarData({ file: null, url: loadedAvatarUrl });
+          localStorage.setItem(
+            "userName",
+            `${loadedProfile.firstName} ${loadedProfile.lastName}`.trim(),
+          );
+          if (loadedAvatarUrl) {
+            localStorage.setItem("userAvatarUrl", loadedAvatarUrl);
+          } else {
+            localStorage.removeItem("userAvatarUrl");
+          }
+          window.dispatchEvent(new Event("bantaybayan-profile-update"));
+        }
+      } catch (error) {
+        console.error("Failed to load profile details:", error);
+        toast.error("Could not load your profile.");
+      }
+    };
+
+    void loadProfile();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill in all password fields.");
+    const toastId = toast.loading("Saving profile...");
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      toast.error("User session not found.", { id: toastId });
       return;
     }
 
+    try {
+      let avatarPath = savedAvatarPath;
+      if (avatarData.file) {
+        avatarPath = `${userId}/admin_avatar_${Date.now()}.${
+          avatarData.file.name.split(".").pop()?.toLowerCase() || "jpg"
+        }`;
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(avatarPath, avatarData.file, {
+            contentType: avatarData.file.type,
+          });
+        if (uploadError) throw new Error(uploadError.message);
+      } else if (!avatarData.url) {
+        avatarPath = null;
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          contact_number: contactNumber,
+          avatar_path: avatarPath,
+        })
+        .eq("id", userId);
+      if (error) throw new Error(error.message);
+
+      const requestedEmail = newEmail.trim().toLowerCase();
+      const emailChangeRequested =
+        requestedEmail !== savedProfile.email.trim().toLowerCase();
+      if (emailChangeRequested) {
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: requestedEmail,
+        });
+        if (emailError) throw new Error(emailError.message);
+        setPendingEmail(requestedEmail);
+      }
+
+      if (savedAvatarPath && savedAvatarPath !== avatarPath) {
+        const { error: cleanupError } = await supabase.storage
+          .from("avatars")
+          .remove([savedAvatarPath]);
+        if (cleanupError) {
+          console.warn("Could not remove the previous avatar:", cleanupError);
+        }
+      }
+
+      const updatedAvatarUrl = avatarPath
+        ? supabase.storage.from("avatars").getPublicUrl(avatarPath).data.publicUrl
+        : null;
+      setSavedAvatarUrl(updatedAvatarUrl);
+      setSavedAvatarPath(avatarPath);
+      setAvatarData({ file: null, url: updatedAvatarUrl });
+      localStorage.setItem("userName", `${firstName} ${lastName}`.trim());
+      if (updatedAvatarUrl) {
+        localStorage.setItem("userAvatarUrl", updatedAvatarUrl);
+      } else {
+        localStorage.removeItem("userAvatarUrl");
+      }
+      window.dispatchEvent(new Event("bantaybayan-profile-update"));
+
+      toast.success(
+        emailChangeRequested
+          ? "Profile saved. Confirm the email change from the verification message."
+          : "Profile updated successfully!",
+        { id: toastId },
+      );
+      setSavedProfile({
+        firstName,
+        lastName,
+        email: savedProfile.email,
+        contactNumber,
+      });
+      setEmail(savedProfile.email);
+      setNewEmail(savedProfile.email);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Could not save your profile.",
+        { id: toastId },
+      );
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setFirstName(savedProfile.firstName);
+    setLastName(savedProfile.lastName);
+    setEmail(savedProfile.email);
+    setNewEmail(savedProfile.email);
+    setContactNumber(savedProfile.contactNumber);
+    setAvatarData({ file: null, url: savedAvatarUrl });
+    setIsEditing(false);
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error("New passwords do not match.");
       return;
@@ -94,216 +476,548 @@ export default function Settings() {
 
     const userId = localStorage.getItem("userId");
     if (!userId) {
-      toast.error("Session expired. Please log in again.");
+      toast.error("User session not found. Please log in again.");
       return;
     }
 
     const toastId = toast.loading("Updating password...");
 
     try {
-      const response = await fetch("http://localhost/api/updatePassword.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: userId,
-          current_password: currentPassword,
-          new_password: newPassword,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.status === "success") {
-        toast.success("Password updated successfully!", { id: toastId });
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      } else {
-        toast.error(`Error: ${result.message}`, { id: toastId });
+      const { data: authData, error: authError } =
+        await supabase.auth.getUser();
+      if (authError || !authData.user?.email) {
+        throw new Error("Could not verify the current Supabase account.");
       }
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: authData.user.email,
+        password: currentPassword,
+      });
+      if (verifyError) throw new Error("Current password is incorrect.");
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (passwordError) throw new Error(passwordError.message);
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Password updated successfully.", {
+        id: toastId,
+      });
     } catch (error) {
-      console.error("Password update failed:", error);
-      toast.error("Network error. Could not connect to server.", { id: toastId });
+      console.error("Failed to update password:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Could not update password.",
+        { id: toastId },
+      );
     }
   };
 
-  // 4. Handle Sound Alerts Toggle
-  const handleSoundToggle = () => {
-    const nextState = !soundAlerts;
-    setSoundAlerts(nextState);
-    localStorage.setItem("soundAlerts", String(nextState));
-    toast.success(nextState ? "Sound alerts enabled" : "Sound alerts disabled");
-  };
-
-  const handleDarkModeToggle = () => {
-    const nextState = !darkMode;
-    setDarkMode(nextState);
-    localStorage.setItem("darkMode", String(nextState));
-    toast.success(nextState ? "Dark mode setting updated" : "Light mode setting updated");
-  };
+  const tabs = [
+    { id: "profile", label: "Profile", icon: LuUser },
+    { id: "security", label: "Security & 2FA", icon: LuLock },
+    { id: "notifications", label: "Notifications", icon: LuBell },
+    { id: "preferences", label: "Preferences", icon: LuPalette },
+  ];
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen text-slate-800">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">System Settings</h1>
-        <p className="text-slate-500 mb-8">
-          Manage your account preferences and dashboard configurations.
-        </p>
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-800 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-8">
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
+            Account center
+          </p>
+          <h1 className="mb-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            Settings
+          </h1>
+          <p className="max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+          Manage your profile, security options, and app preferences.
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            
-            {/* Profile Management Form */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <LuUser className="text-indigo-600" /> Profile Management
-              </h2>
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      First Name
-                    </label>
-                    <input placeholder="John"
-                      type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Last Name
-                    </label>
-                    <input placeholder="Doe"
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                      required
-                    />
-                  </div>
-                </div>
+        {/* Navigation Tabs */}
+        <div className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as Tab)}
+                className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
+                  activeTab === tab.id
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                }`}
+              >
+                <Icon size={18} /> {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tab Content */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          <div key={activeTab} className="settings-tab-enter">
+          {/* PROFILE TAB */}
+          {activeTab === "profile" && (
+            <div className="max-w-3xl space-y-7">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Contact Number
-                  </label>
-                  <input
-                    placeholder="123-456-7890"
-                    type="text"
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                    required
-                  />
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                    Personal Details
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Keep your account information up to date.
+                  </p>
                 </div>
-                <button
-                  type="submit"
-                  className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition cursor-pointer"
-                >
-                  Save Changes
-                </button>
-              </form>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  >
+                    Edit Profile
+                  </button>
+                )}
+              </div>
+
+              {/* Avatar Component */}
+              <AvatarCustomizer
+                initialAvatarUrl={avatarData.url}
+                firstName={firstName}
+                lastName={lastName}
+                readOnly={!isEditing}
+                onChange={(data) => setAvatarData(data)}
+              />
+
+              {!isEditing ? (
+                /* VIEW MODE */
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        First Name
+                    </p>
+                    <p className="font-semibold text-slate-800">
+                        {firstName || "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Last Name
+                    </p>
+                    <p className="font-semibold text-slate-800">
+                        {lastName || "—"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:col-span-2">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Email Address
+                    </p>
+                    <p className="break-all font-semibold text-slate-800">
+                      {email || "—"}
+                    </p>
+                  </div>
+                  {pendingEmail && (
+                    <p
+                      className="text-sm text-amber-700 sm:col-span-2"
+                      role="status"
+                    >
+                      Email confirmation is pending for {pendingEmail}. Your
+                      current email stays active until verification is complete.
+                    </p>
+                  )}
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:col-span-2">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Contact Number
+                    </p>
+                    <p className="font-semibold text-slate-800">
+                      {contactNumber || "—"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* EDIT MODE */
+                <form onSubmit={handleSaveProfile} className="space-y-6">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                    />
+                  </div>
+                  {pendingEmail && (
+                    <p className="text-sm text-amber-700" role="status">
+                      Email confirmation is pending for {pendingEmail}. Your
+                      current email stays active until verification is complete.
+                    </p>
+                  )}
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Contact Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={contactNumber}
+                      onChange={(e) => setContactNumber(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                    />
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center">
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    >
+                      Save Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
+          )}
 
-            {/* Security Form */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <LuLock className="text-indigo-600" /> Security
-              </h2>
-              <form onSubmit={handleUpdatePassword} className="space-y-4">
+          {/* SECURITY TAB */}
+          {activeTab === "security" && (
+            <div className="max-w-3xl space-y-7">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                  Security
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Update your password to help keep your account secure.
+                </p>
+              </div>
+              <form
+                onSubmit={handleUpdatePassword}
+                className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-5 sm:p-6"
+              >
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Change Password
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Enter your current password, then choose a new one.
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
                     Current Password
                   </label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={visiblePasswords.current ? "text" : "password"}
+                      required
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 pr-11 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisiblePasswords((visible) => ({
+                          ...visible,
+                          current: !visible.current,
+                        }))
+                      }
+                      aria-label={visiblePasswords.current ? "Hide current password" : "Show current password"}
+                      className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3 text-slate-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                    >
+                      {visiblePasswords.current ? <LuEyeOff size={18} /> : <LuEye size={18} />}
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
                       New Password
                     </label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={visiblePasswords.new ? "text" : "password"}
+                        required
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 pr-11 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVisiblePasswords((visible) => ({
+                            ...visible,
+                            new: !visible.new,
+                          }))
+                        }
+                        aria-label={visiblePasswords.new ? "Hide new password" : "Show new password"}
+                        className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3 text-slate-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                      >
+                        {visiblePasswords.new ? <LuEyeOff size={18} /> : <LuEye size={18} />}
+                      </button>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Confirm New Password
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Confirm Password
                     </label>
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={visiblePasswords.confirm ? "text" : "password"}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 pr-11 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVisiblePasswords((visible) => ({
+                            ...visible,
+                            confirm: !visible.confirm,
+                          }))
+                        }
+                        aria-label={visiblePasswords.confirm ? "Hide confirm password" : "Show confirm password"}
+                        className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3 text-slate-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                      >
+                        {visiblePasswords.confirm ? <LuEyeOff size={18} /> : <LuEye size={18} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <button
                   type="submit"
-                  className="bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-900 transition cursor-pointer"
+                  className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
                 >
                   Update Password
                 </button>
               </form>
+              <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Authenticator app
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Require a time-based code from an authenticator app when
+                    signing in.
+                  </p>
+                </div>
+                {totpFactorId ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-emerald-700">
+                      Two-factor authentication is enabled.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void disableTotp()}
+                      disabled={isTotpBusy}
+                      className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                    >
+                      Disable authenticator
+                    </button>
+                  </div>
+                ) : totpEnrollment ? (
+                  <form onSubmit={confirmTotpEnrollment} className="space-y-4">
+                    <img
+                      src={totpEnrollment.qrCode}
+                      alt="Scan this QR code with your authenticator app"
+                      className="h-48 w-48 rounded-lg border border-slate-200 bg-white p-2"
+                    />
+                    <p className="break-all text-sm text-slate-600">
+                      If you cannot scan the QR code, enter this secret:
+                      <strong className="ml-1 font-mono">{totpEnrollment.secret}</strong>
+                    </p>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Verification code
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        value={totpCode}
+                        onChange={(event) =>
+                          setTotpCode(
+                            event.target.value.replace(/\D/g, "").slice(0, 6),
+                          )
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-center text-lg tracking-[0.4em]"
+                        required
+                      />
+                    </label>
+                    <div className="flex gap-3">
+                      <button
+                        type="submit"
+                        disabled={isTotpBusy}
+                        className="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {isTotpBusy ? "Verifying…" : "Verify and enable"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTotpEnrollment(null)}
+                        disabled={isTotpBusy}
+                        className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void beginTotpEnrollment()}
+                    disabled={isTotpBusy}
+                    className="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {isTotpBusy ? "Preparing…" : "Set up authenticator"}
+                  </button>
+                )}
+              </section>
             </div>
-          </div>
+          )}
 
-          {/* Preferences Box with Toggle Switches
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <LuBell className="text-indigo-600" /> Preferences
-              </h2>
-              
-              Sound Alerts Toggle Switch 
-              <div className="flex items-center justify-between mb-5">
-                <span className="text-slate-700 text-sm">
-                  Sound Alerts (New Incidents)
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={soundAlerts}
-                    onChange={handleSoundToggle}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                </label>
+          {/* NOTIFICATIONS TAB */}
+          {activeTab === "notifications" && (
+            <div className="max-w-3xl space-y-6">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                  Notification Preferences
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Choose how you’d like to receive updates and alerts.
+                </p>
               </div>
 
-              
-              <div className="flex items-center justify-between">
-                <span className="text-slate-700 text-sm flex items-center gap-2">
-                  <LuMoon /> Dark Mode
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={darkMode}
-                    onChange={handleDarkModeToggle}
-                    className="sr-only peer"
+              {/* Push Notifications */}
+              <div className="flex items-center justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md sm:p-5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">Push Notifications</p>
+                  <p className="mt-1 text-sm leading-5 text-slate-500">
+                    Instant alerts in your web browser
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={pushNotifications}
+                  aria-busy={isPushBusy}
+                  aria-label="Push Notifications"
+                  disabled={isPushBusy}
+                  onClick={() => void handlePushNotificationsChange(!pushNotifications)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${
+                    pushNotifications ? "bg-indigo-600" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      pushNotifications ? "translate-x-5" : "translate-x-0"
+                    }`}
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                </label>
+                </button>
               </div>
-              
+
+              {/* Sound Alerts */}
+              <div className="flex items-center justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md sm:p-5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">Sound Alerts</p>
+                  <p className="mt-1 text-sm leading-5 text-slate-500">
+                    Play a chime when new incidents occur
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={soundAlerts}
+                  aria-label="Sound Alerts"
+                  onClick={() => handleSoundAlertsChange(!soundAlerts)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+                    soundAlerts ? "bg-indigo-600" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      soundAlerts ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
-            
+          )}
+
+          {/* PREFERENCES TAB */}
+          {activeTab === "preferences" && (
+            <div className="max-w-3xl space-y-6">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                  App Preferences
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Personalize the appearance of your workspace.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5 sm:p-6">
+                <label className="mb-1 block text-sm font-semibold text-slate-800">
+                  Interface Theme
+                </label>
+                <p className="mb-4 text-sm text-slate-500">
+                  Choose a theme or match your device settings.
+                </p>
+                <select
+                  value={theme}
+                  onChange={(e) =>
+                    handleThemeChange(e.target.value as "light" | "dark" | "system")
+                  }
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 sm:max-w-md"
+                >
+                  <option value="system">System Default</option>
+                  <option value="light">Light Mode</option>
+                  <option value="dark">Dark Mode</option>
+                </select>
+              </div>
+            </div>
+          )}
           </div>
-          */}
         </div>
       </div>
     </div>

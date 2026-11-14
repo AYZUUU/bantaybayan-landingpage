@@ -1,10 +1,15 @@
 import * as ImagePicker from "expo-image-picker";
+import Toast from "react-native-toast-message";
 
 export const pickSource = async (setPhoto: (uri: string) => void) => {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
 
   if (!permission.granted) {
-    alert("Camera permission is required!");
+    Toast.show({
+      type: "error",
+      text1: "Camera Permission Required",
+      text2: "Allow camera access to take an incident photo.",
+    });
     return;
   }
 

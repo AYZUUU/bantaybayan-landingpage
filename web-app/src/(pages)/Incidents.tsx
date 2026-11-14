@@ -1,36 +1,134 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { useOutletContext } from "react-router-dom";
 import toast from "react-hot-toast";
-import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
-import "./dashboard.css";
+import {
+  LuShieldAlert,
+  LuClock,
+  LuTruck,
+  LuCircleCheck,
+  LuUserCheck,
+  LuPhone,
+  LuCalendar,
+  LuMapPin,
+  LuX,
+  LuTriangleAlert,
+  LuFileText,
+  LuListFilter,
+} from "react-icons/lu";
+import IncidentMap from "../components/IncidentMap";
+import { getActiveResponders, updateAdminReport } from "../utils/reports";
 
 interface Report {
   id: number;
   emergency_type: string;
   accident_level: string;
   reporter_name: string;
-  contact_number?: string | null;  
-  email?: string | null;         
-  user_id_photo?: string | null;   
+  contact_number?: string | null;
+  description?: string | null;
+  email?: string | null;
+  user_id_photo?: string | null;
   image_path: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   created_at: string;
-  assigned_responder_id?: number | null;
+  assigned_responder_id?: string | null;
+  backup_requested_at?: string | null;
+  backup_note?: string | null;
 }
 
 interface Responder {
-  id: number;
+  id: string;
   first_name: string;
   last_name: string;
   contact_number: string;
 }
 
+type FilterStatus = "all" | "pending" | "dispatched" | "en route" | "resolved";
+const INCIDENT_STATUS_TOAST_ID = "incident-status-update";
+
+function getDisplayStatus(status?: string | null): Exclude<FilterStatus, "all"> {
+  const normalizedStatus = status?.trim().toLowerCase() || "";
+  if (normalizedStatus.includes("resolved")) return "resolved";
+  if (normalizedStatus.includes("en route")) return "en route";
+  if (normalizedStatus.includes("dispatched")) return "dispatched";
+  return "pending";
+}
+
+function getFilterStatus(status?: string | null): Exclude<FilterStatus, "all"> {
+  const displayStatus = getDisplayStatus(status);
+  return displayStatus === "en route" ? "dispatched" : displayStatus;
+}
+
 export default function Incidents() {
-  const [reports, setReports] = useState<Report[]>([]);
+  const { reports, setReports } = useOutletContext<{
+    reports: Report[];
+    setReports: React.Dispatch<React.SetStateAction<Report[]>>;
+  }>();
+
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false);
+  const [dispatchReport, setDispatchReport] = useState<Report | null>(null);
+  const [selectedResponderId, setSelectedResponderId] = useState("");
   const [responders, setResponders] = useState<Responder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoadingResponders, setIsLoadingResponders] = useState(false);
+  const [responderLoadError, setResponderLoadError] = useState<string | null>(
+    null,
+  );
+  const [activeFilter, setActiveFilter] = useState<FilterStatus>("all");
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const filterLoadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (filterLoadingTimer.current) clearTimeout(filterLoadingTimer.current);
+    };
+  }, []);
+
+  const handleFilterChange = (filter: FilterStatus) => {
+    if (filter === activeFilter) return;
+
+    setActiveFilter(filter);
+    setIsFilterLoading(true);
+    if (filterLoadingTimer.current) clearTimeout(filterLoadingTimer.current);
+    filterLoadingTimer.current = setTimeout(() => {
+      setIsFilterLoading(false);
+      filterLoadingTimer.current = null;
+    }, 280);
+  };
+
+  useEffect(() => {
+    if (!selectedReport) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedReport]);
+
+  useEffect(() => {
+    if (!isEvidencePreviewOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsEvidencePreviewOpen(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEvidencePreviewOpen]);
+
+  useEffect(() => {
+    if (!dispatchReport) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDispatchReport(null);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [dispatchReport]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
@@ -44,453 +142,735 @@ export default function Incidents() {
     });
   };
 
-  // Fetch Reports and Responders on Component Mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 1. Fetch Reports
-        const reportsRes = await fetch("http://localhost/api/getReports.php");
-        const reportsJson = await reportsRes.json();
-        
-        if (reportsJson.status === "success" || Array.isArray(reportsJson)) {
-          setReports(Array.isArray(reportsJson) ? reportsJson : reportsJson.data);
-        }
-
-        // 2. Fetch Responders
-        const respondersRes = await fetch("http://localhost/api/getResponders.php");
-        const respondersJson = await respondersRes.json();
-        
-        if (respondersJson.status === "success") {
-          setResponders(respondersJson.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
-        toast.error("Could not connect to server to load reports.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+  const fetchResponders = useCallback(async () => {
+    setIsLoadingResponders(true);
+    setResponderLoadError(null);
+    try {
+      setResponders(await getActiveResponders());
+    } catch (error) {
+      console.error("Failed to fetch responders:", error);
+      setResponderLoadError(
+        error instanceof Error ? error.message : "Could not load responders.",
+      );
+    } finally {
+      setIsLoadingResponders(false);
+    }
   }, []);
 
   const handleStatusChange = async (
     reportId: number,
     newStatus: string,
-    responderId?: string,
-  ) => {
-    const toastId = toast.loading("Updating incident...");
+    responderId?: string
+  ): Promise<boolean> => {
+    toast.loading("Updating incident status...", {
+      id: INCIDENT_STATUS_TOAST_ID,
+    });
 
     try {
-      const response = await fetch("http://localhost/api/updateStatus.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: reportId,
-          status: newStatus,
-          responder_id: responderId,
-        }),
-      });
+      await updateAdminReport(reportId, newStatus, responderId);
+      toast.success(
+        responderId
+          ? "Responder unit assigned & dispatched!"
+          : "Status updated successfully!",
+        { id: INCIDENT_STATUS_TOAST_ID },
+      );
 
-      const data = await response.json();
-
-      if (data.status === "success") {
-        toast.success(
-          responderId
-            ? "Responder assigned and dispatched!"
-            : "Status successfully updated!",
-          { id: toastId },
-        );
-
-        setReports((prevReports) =>
-          prevReports.map((report) =>
-            report.id === reportId
-              ? {
-                  ...report,
-                  status: newStatus,
-                  assigned_responder_id: responderId
-                    ? parseInt(responderId)
-                    : report.assigned_responder_id,
-                }
-              : report,
-          ),
-        );
-      } else {
-        toast.error("Failed to update status.", { id: toastId });
-      }
+      const updateReport = (report: Report): Report =>
+        report.id === reportId
+          ? {
+              ...report,
+              status: newStatus,
+              assigned_responder_id:
+                responderId ?? report.assigned_responder_id,
+            }
+          : report;
+      setReports((prevReports) => prevReports.map(updateReport));
+      setSelectedReport((currentReport) =>
+        currentReport?.id === reportId
+          ? updateReport(currentReport)
+          : currentReport,
+      );
+      return true;
     } catch (error) {
       console.error("Update error:", error);
-      toast.error("Network error. Could not connect to server.", {
-        id: toastId,
-      });
+      toast.error(
+        error instanceof Error ? error.message : "Could not update incident.",
+        {
+        id: INCIDENT_STATUS_TOAST_ID,
+        },
+      );
+      return false;
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", fontSize: "1.1rem", color: "#555" }}>
-        Loading incident reports...
-      </div>
+  const openDispatchModal = (report: Report) => {
+    setSelectedResponderId(
+      report.assigned_responder_id
+        ? String(report.assigned_responder_id)
+        : ""
     );
-  }
+    setResponderLoadError(null);
+    setDispatchReport(report);
+    void fetchResponders();
+  };
+
+  const confirmDispatch = async () => {
+    if (!dispatchReport || !selectedResponderId) return;
+    const wasDispatched = await handleStatusChange(
+      dispatchReport.id,
+      "dispatched",
+      selectedResponderId
+    );
+    if (wasDispatched) setDispatchReport(null);
+  };
+
+  const getSeverityBadgeClass = (level?: string) => {
+    const l = level?.toLowerCase() || "";
+    if (l === "critical") return "bg-rose-100 text-rose-700 border-rose-200";
+    if (l === "high") return "bg-orange-100 text-orange-700 border-orange-200";
+    if (l === "medium") return "bg-amber-100 text-amber-700 border-amber-200";
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  };
+
+  const filteredReports = useMemo(() => {
+    return reports
+      .filter(
+        (report) =>
+          activeFilter === "all" || getFilterStatus(report.status) === activeFilter
+      )
+      .sort(
+        (a, b) =>
+          Number(getDisplayStatus(a.status) === "resolved") -
+            Number(getDisplayStatus(b.status) === "resolved") ||
+          Number(!!b.backup_requested_at) - Number(!!a.backup_requested_at)
+      );
+  }, [reports, activeFilter]);
+
+  const counts = useMemo(() => {
+    return {
+      all: reports.length,
+      pending: reports.filter((report) => getDisplayStatus(report.status) === "pending").length,
+      dispatched: reports.filter((report) => getFilterStatus(report.status) === "dispatched").length,
+      resolved: reports.filter((report) => getDisplayStatus(report.status) === "resolved").length,
+    };
+  }, [reports]);
+
+  const statusFilters = [
+    {
+      id: "all",
+      label: "All reports",
+      icon: LuFileText,
+      activeClass: "border-slate-800 bg-slate-800 text-white shadow-md shadow-slate-900/10",
+      countClass: "bg-white/15 text-white",
+    },
+    {
+      id: "pending",
+      label: "Pending",
+      icon: LuClock,
+      activeClass: "border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-500/20",
+      countClass: "bg-white/20 text-white",
+    },
+    {
+      id: "dispatched",
+      label: "Dispatched",
+      icon: LuTruck,
+      activeClass: "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20",
+      countClass: "bg-white/20 text-white",
+    },
+    {
+      id: "resolved",
+      label: "Resolved",
+      icon: LuCircleCheck,
+      activeClass: "border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/20",
+      countClass: "bg-white/20 text-white",
+    },
+  ] as const;
 
   return (
-    <div className="dashboard">
-      <header className="dash-header">
-        <h1>BantayBayan Command Center</h1>
-        <div className="stats">
-          <span>Active Reports: {reports.length}</span>
-        </div>
-      </header>
-
-      <div
-        className="cards-container"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-          gap: "20px",
-          padding: "20px",
-        }}
-      >
-        {reports.length === 0 ? (
-          <p style={{ gridColumn: "1 / -1", textAlign: "center", color: "#777", padding: "40px" }}>
-            No incident reports found in the database.
+    <div className="min-h-screen w-full bg-slate-50/70 px-4 py-8 font-sans text-slate-800 sm:px-6 lg:px-8">
+      {/* Responsive Header */}
+      <div className="mx-auto mb-6 flex max-w-7xl flex-col items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:p-7">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            Live Command Stream
+          </div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+            BantayBayan Command Center
+          </h1>
+          <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
+            Real-time incident queue & dispatch management
           </p>
-        ) : (
-          reports.map((report) => (
-            <div
-              key={report.id}
-              className="report-card"
-              onClick={() => setSelectedReport(report)}
-              style={{
-                backgroundColor: report.status?.toLowerCase() === "resolved" ? "#d1fae5" : "white",
-                borderColor: report.status?.toLowerCase() === "resolved" ? "#10b981" : "#eaeaea",
-                borderRadius: "12px",
-                padding: "20px",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-                border: "1px solid #eaeaea",
-                transition: "transform 0.2s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.transform = "translateY(-3px)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.transform = "translateY(0)")
-              }
+        </div>
+
+        <div className="w-full sm:w-auto bg-slate-100/80 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border border-slate-200 flex items-center justify-between sm:justify-start gap-3">
+          <div className="flex items-center gap-2">
+            <LuShieldAlert className="text-blue-600 shrink-0" size={22} />
+            <span className="text-xs sm:text-sm font-bold text-slate-700">Active Queue:</span>
+          </div>
+          <span className="text-blue-600 font-black text-base">{reports.length}</span>
+        </div>
+      </div>
+
+      {/* Responsive Filter Bar */}
+      <div className="mx-auto mb-6 max-w-7xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
+              <LuListFilter size={17} className="text-blue-600" />
+              Filter by status
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Showing {filteredReports.length} of {reports.length} reports
+            </p>
+          </div>
+          {activeFilter !== "all" && (
+            <button
+              type="button"
+              onClick={() => handleFilterChange("all")}
+              className="cursor-pointer rounded-lg px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
+              Clear filter
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {statusFilters.map((filter) => {
+            const Icon = filter.icon;
+            const isActive = activeFilter === filter.id;
+            return (
+              <button
+                key={filter.id}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => handleFilterChange(filter.id)}
+                className={`flex min-w-0 cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 py-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 sm:px-4 ${
+                  isActive
+                    ? filter.activeClass
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                }`}
               >
-                <h3 style={{ margin: 0, fontSize: "1.2rem", color: "#222" }}>
-                  {report.emergency_type}
-                </h3>
-                <span
-                  className={`badge ${report.accident_level?.toLowerCase()}`}
-                  style={{ fontSize: "0.8rem", padding: "4px 8px" }}
-                >
-                  {report.accident_level}
+                <span className="flex min-w-0 items-center gap-2">
+                  <Icon size={17} className="shrink-0" />
+                  <span className="truncate text-xs font-semibold sm:text-sm">
+                    {filter.label}
+                  </span>
                 </span>
+                <span
+                  className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-bold ${
+                    isActive
+                      ? filter.countClass
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {counts[filter.id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Grid: Responsive Columns (1col -> 2col -> 3col) */}
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {isFilterLoading ? (
+          Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={`incident-filter-skeleton-${index}`}
+              role="status"
+              aria-label="Loading filtered incidents"
+              className="motion-safe:animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+            >
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div className="h-6 w-2/3 rounded-lg bg-slate-200" />
+                <div className="h-6 w-20 rounded-lg bg-slate-100" />
               </div>
-
-              <p style={{ margin: 0, color: "#666", fontSize: "0.95rem" }}>
-                <strong>Reported by:</strong> {report.reporter_name}
-              </p>
-
-              <p style={{ margin: 0, color: "#888", fontSize: "0.85rem" }}>
-                <strong>Date:</strong> {formatDate(report.created_at)}
-              </p>
-
-              {/* ACTION AREA */}
-              <div
-                style={{
-                  marginTop: "auto",
-                  paddingTop: "15px",
-                  borderTop: "1px solid #f0f0f0",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span style={{ fontSize: "0.85rem", fontWeight: "bold", color: "#444" }}>
-                    Action Status:
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "0.85rem",
-                      color: report.image_path ? "#4D8BE2" : "#999",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {report.image_path ? "Photo Attached" : "Map Location"}
-                  </span>
+              <div className="space-y-3 rounded-xl bg-slate-50 p-4">
+                <div className="h-3 w-4/5 rounded bg-slate-200" />
+                <div className="h-3 w-3/5 rounded bg-slate-200" />
+              </div>
+              <div className="mt-6 border-t border-slate-100 pt-4">
+                <div className="mb-3 h-3 w-1/3 rounded bg-slate-200" />
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="h-10 rounded-xl bg-slate-100" />
+                  <div className="h-10 rounded-xl bg-slate-100" />
+                  <div className="h-10 rounded-xl bg-slate-100" />
                 </div>
-            
-                <div 
-                  style={{ display: "flex", gap: "8px", width: "100%" }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => handleStatusChange(report.id, "pending")}
-                    style={{
-                      flex: 1,
-                      padding: "8px 0",
-                      borderRadius: "6px",
-                      border: "none",
-                      fontWeight: "bold",
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      backgroundColor: report.status.toLowerCase() === "pending" ? "#f59e0b" : "#fef3c7",
-                      color: report.status.toLowerCase() === "pending" ? "white" : "#b45309",
-                    }}
-                  >
-                    Pending
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(report.id, "dispatched")}
-                    style={{
-                      flex: 1,
-                      padding: "8px 0",
-                      borderRadius: "6px",
-                      border: "none",
-                      fontWeight: "bold",
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      backgroundColor: report.status.toLowerCase() === "dispatched" ? "#3b82f6" : "#dbeafe",
-                      color: report.status.toLowerCase() === "dispatched" ? "white" : "#1e3a8a",
-                    }}
-                  >
-                    Dispatch
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(report.id, "resolved")}
-                    style={{
-                      flex: 1,
-                      padding: "8px 0",
-                      borderRadius: "6px",
-                      border: "none",
-                      fontWeight: "bold",
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      backgroundColor: report.status.toLowerCase() === "resolved" ? "#10b981" : "#d1fae5",
-                      color: report.status.toLowerCase() === "resolved" ? "white" : "#065f46",
-                    }}
-                  >
-                    Resolve
-                  </button>
-                </div>
-
-                {report.status.toLowerCase() === "dispatched" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px",
-                      marginTop: "4px",
-                      padding: "10px",
-                      backgroundColor: "#f8fafc",
-                      borderRadius: "8px",
-                      border: "1px dashed #cbd5e1"
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <label style={{ fontSize: "0.8rem", color: "#334155", fontWeight: "bold" }}>
-                      Assign Responder Unit:
-                    </label>
-                    <select
-                      value={report.assigned_responder_id ? String(report.assigned_responder_id) : ""}
-                      onChange={(e) => {
-                        handleStatusChange(report.id, "dispatched", e.target.value);
-                      }}
-                      style={{
-                        padding: "8px",
-                        borderRadius: "6px",
-                        border: "1px solid #cbd5e1",
-                        cursor: "pointer",
-                        fontSize: "0.85rem",
-                        backgroundColor: "white",
-                        outline: "none"
-                      }}
-                    >
-                      <option value="" disabled>-- Select Unit --</option>
-                      {responders.map((responder) => (
-                        <option key={responder.id} value={responder.id}>
-                          {responder.first_name} {responder.last_name} ({responder.contact_number})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
             </div>
           ))
+        ) : filteredReports.length === 0 ? (
+          <div className="col-span-full bg-white p-8 sm:p-16 rounded-2xl sm:rounded-3xl border border-slate-200/80 text-center shadow-xs">
+            <LuFileText size={48} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-slate-600 font-bold text-base sm:text-lg">
+              {reports.length === 0
+                ? "No active incident reports found in database."
+                : `No "${activeFilter}" incident reports found.`}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              Select another status filter above or wait for incoming reports.
+            </p>
+          </div>
+        ) : (
+          filteredReports.map((report) => {
+            const currentStatus = getDisplayStatus(report.status);
+            const isResolved = currentStatus === "resolved";
+
+            return (
+              <div
+                key={report.id}
+                onClick={() => setSelectedReport(report)}
+                className={`group flex cursor-pointer flex-col justify-between rounded-2xl border p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-6 ${
+                  isResolved
+                    ? "bg-emerald-50/40 border-emerald-300/80 shadow-emerald-500/5"
+                    : "bg-white border-slate-200 hover:-translate-y-1 hover:border-blue-300"
+                }`}
+              >
+                <div className="space-y-3.5">
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                      {report.emergency_type}
+                    </h3>
+                    <span
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-black uppercase border shrink-0 tracking-wider ${getSeverityBadgeClass(
+                        report.accident_level
+                      )}`}
+                    >
+                      {report.accident_level || "Standard"}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100 space-y-1.5 text-xs text-slate-600">
+                    {report.backup_requested_at && (
+                      <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 font-bold text-amber-800">
+                        <LuTriangleAlert size={15} className="mt-0.5 shrink-0" />
+                        <span>
+                          Backup requested
+                          {report.backup_note ? `: ${report.backup_note}` : ""}
+                        </span>
+                      </p>
+                    )}
+                    <p className="flex items-center gap-2 truncate">
+                      <LuUserCheck size={15} className="text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        <strong className="text-slate-800">Reporter:</strong> {report.reporter_name}
+                      </span>
+                    </p>
+                    <p className="flex items-center gap-2 truncate">
+                      <LuCalendar size={15} className="text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        <strong className="text-slate-800">Logged:</strong> {formatDate(report.created_at)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider text-[11px]">
+                      Dispatch Action
+                    </span>
+                    <span
+                      className={`font-bold flex items-center gap-1.5 text-[11px] ${
+                        report.image_path ? "text-blue-600" : "text-slate-400"
+                      }`}
+                    >
+                      {report.image_path ? " Photo" : " Map"}
+                    </span>
+                  </div>
+
+                  <div
+                    className="grid grid-cols-3 gap-1.5 sm:gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span
+                      role="status"
+                      aria-label={`Current status: ${currentStatus}`}
+                      className={`py-2.5 px-1 sm:px-2 rounded-xl sm:rounded-2xl font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1 ${
+                        currentStatus === "pending"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200/60"
+                          : currentStatus === "dispatched" ||
+                              currentStatus === "en route"
+                            ? "bg-blue-50 text-blue-700 border border-blue-200/60"
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                      }`}
+                    >
+                      {currentStatus === "pending" ? (
+                        <LuClock size={13} />
+                      ) : currentStatus === "dispatched" ||
+                        currentStatus === "en route" ? (
+                        <LuTruck size={13} />
+                      ) : (
+                        <LuCircleCheck size={13} />
+                      )}
+                      <span className="capitalize">{currentStatus}</span>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => openDispatchModal(report)}
+                      className={`py-2.5 px-1 sm:px-2 rounded-xl sm:rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        currentStatus === "dispatched" ||
+                          currentStatus === "en route"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-blue-50 text-blue-700 hover:bg-blue-100/80 border border-blue-200/60"
+                      }`}
+                    >
+                      <LuTruck size={13} />
+                      <span className="hidden xs:inline">Dispatch</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(report.id, "resolved")}
+                      className={`py-2.5 px-1 sm:px-2 rounded-xl sm:rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        currentStatus === "resolved"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80 border border-emerald-200/60"
+                      }`}
+                    >
+                      <LuCircleCheck size={13} />
+                      <span className="hidden xs:inline">Resolve</span>
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Unified Preview Modal */}
+      {/* Responsive Modal Overlay */}
       {selectedReport && (
-        <div
-          className="map-modal-overlay"
-          onClick={() => setSelectedReport(null)}
-          style={{
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(0,0,0,0.6)",
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-        >
+        createPortal(
           <div
-            className="map-modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "white",
-              padding: "25px",
-              borderRadius: "12px",
-              maxWidth: "1000px",
-              width: "90%",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              position: "relative",
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr", 
-              gap: "25px",
-            }}
+            className="web-modal-backdrop incident-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-3 backdrop-blur-sm sm:p-4"
+            onClick={() => setSelectedReport(null)}
           >
-            <button
-              className="close-modal-btn"
-              onClick={() => setSelectedReport(null)}
-              style={{
-                position: "absolute",
-                right: "15px",
-                top: "10px",
-                fontSize: "1.8rem",
-                color: "#333",
-                border: "none",
-                background: "none",
-                cursor: "pointer",
-              }}
+            <div
+              className="web-modal-panel incident-modal-panel relative w-full max-w-4xl space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:space-y-6 sm:p-8"
+              onClick={(e) => e.stopPropagation()}
             >
-              &times;
-            </button>
-
-            <h3 style={{ gridColumn: "1 / -1", marginTop: 0, borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
-              {selectedReport.emergency_type} -{" "}
-              <span style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
-                {formatDate(selectedReport.created_at)}
-              </span>
-            </h3>
-
-            {/* COLUMN 1: Reporter Identity & Incident Photo */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-              <div style={{ backgroundColor: "#f8fafc", padding: "15px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                <h4 style={{ margin: "0 0 10px 0", color: "#1e293b", fontSize: "1rem" }}>
-                  Reporter Verification
-                </h4>
-                <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "#333" }}>
-                  <strong>Name:</strong> {selectedReport.reporter_name}
+              <div className="flex justify-between items-start border-b border-slate-100 pb-3 sm:pb-4">
+              <div>
+                <span className="text-[10px] sm:text-xs font-bold text-blue-600 uppercase tracking-wider">
+                  Incident Verification & Detail
+                </span>
+                <h3 className="text-lg sm:text-2xl font-black text-slate-900 mt-0.5">
+                  {selectedReport.emergency_type}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                  <LuCalendar size={13} /> Logged on {formatDate(selectedReport.created_at)}
                 </p>
-                <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "#333" }}>
-                  <strong>Contact:</strong> {selectedReport.contact_number || "N/A"}
-                </p>
-                
-                {selectedReport.user_id_photo ? (
-                  <div style={{ marginTop: "10px" }}>
-                    <strong style={{ fontSize: "0.85rem", color: "#2563eb" }}>Verified ID Document:</strong>
-                    <img
-                      src={selectedReport.user_id_photo}
-                      alt="User ID"
-                      style={{
-                        width: "100%",
-                        height: "100px",
-                        objectFit: "cover",
-                        borderRadius: "6px",
-                        marginTop: "5px",
-                        border: "1px solid #cbd5e1"
-                      }}
-                    />
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReport(null)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <LuX size={22} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+              <div className="space-y-4">
+                <div className="bg-slate-50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <LuUserCheck size={16} className="text-blue-600" />
+                    Reporter Verification
+                  </h4>
+                  <div className="space-y-1 text-xs text-slate-700">
+                    <p><strong>Name:</strong> {selectedReport.reporter_name}</p>
+                    <p className="flex items-center gap-1">
+                      <LuPhone size={13} className="text-slate-400" />
+                      <strong>Contact:</strong> {selectedReport.contact_number || "N/A"}
+                    </p>
                   </div>
-                ) : (
-                  <p style={{ fontSize: "0.85rem", color: "#ef4444", fontStyle: "italic", marginTop: "10px" }}>
-                    ⚠️ No ID on file for this user.
-                  </p>
+
+                  {selectedReport.user_id_photo ? (
+                    <div className="pt-2 border-t border-slate-200/60">
+                      <p className="text-[11px] font-bold text-blue-600 mb-1">
+                        Verified Government / Student ID:
+                      </p>
+                      <img
+                        src={selectedReport.user_id_photo}
+                        alt="Scanned ID"
+                        className="w-full h-24 sm:h-28 object-cover rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-rose-50 text-rose-600 rounded-lg text-xs font-semibold flex items-center gap-1 border border-rose-200">
+                      <LuTriangleAlert size={14} />
+                      <span>No scanned ID on file for this account.</span>
+                    </div>
+                  )}
+                </div>
+
+                {selectedReport.image_path && (
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Visual Evidence
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setIsEvidencePreviewOpen(true)}
+                      aria-label="Preview incident evidence"
+                      className="group relative block w-full cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:rounded-2xl"
+                    >
+                      <img
+                        src={selectedReport.image_path || undefined}
+                        alt="Incident Evidence"
+                        className="h-40 w-full object-cover transition-transform group-hover:scale-[1.02] sm:h-48"
+                      />
+                      <span className="absolute inset-x-0 bottom-0 bg-slate-950/60 px-3 py-2 text-center text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                        Click to preview
+                      </span>
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {selectedReport.image_path && (
-                <div>
-                  <h4 style={{ margin: "0 0 10px 0", color: "#555" }}>Visual Evidence</h4>
-                  <img
-                    src={`http://localhost/api/${selectedReport.image_path}`}
-                    alt="Enlarged Evidence"
-                    style={{
-                      width: "100%",
-                      height: "220px",
-                      borderRadius: "8px",
-                      objectFit: "cover",
-                      backgroundColor: "#f3f4f6",
-                      border: "1px solid #eaeaea"
-                    }}
+              <div className="flex flex-col space-y-2">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                  <LuMapPin size={15} className="text-rose-600" />
+                  Exact Pinned Location
+                </h4>
+                <div className="w-full h-64 lg:h-full min-h-[240px] sm:min-h-[280px] rounded-xl sm:rounded-2xl overflow-hidden border border-slate-200">
+                  {selectedReport.latitude === null ||
+                  selectedReport.longitude === null ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 bg-amber-50 p-4 text-center">
+                      <LuTriangleAlert size={22} className="text-amber-600" />
+                      <p className="text-sm font-bold text-amber-900">
+                        Location not provided
+                      </p>
+                      <p className="text-xs text-amber-800">
+                        This came in by text message. Call the sender
+                        {selectedReport.contact_number
+                          ? ` at ${selectedReport.contact_number}`
+                          : ""}{" "}
+                        to confirm where help is needed.
+                      </p>
+                      {selectedReport.description && (
+                        <p className="mt-1 w-full break-words rounded-lg bg-white p-2 text-left text-xs text-slate-700">
+                          &ldquo;{selectedReport.description}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                  <IncidentMap
+                    center={[
+                      Number(selectedReport.latitude),
+                      Number(selectedReport.longitude),
+                    ]}
+                    zoom={16}
+                    markers={[
+                      {
+                        id: selectedReport.id,
+                        latitude: Number(selectedReport.latitude),
+                        longitude: Number(selectedReport.longitude),
+                      },
+                    ]}
                   />
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Map Location */}
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <h4 style={{ margin: "0 0 10px 0", color: "#555" }}>Exact Location</h4>
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  minHeight: "350px",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                  border: "1px solid #eaeaea"
-                }}
-              >
-                <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-                  <Map
-                    defaultCenter={{
-                      lat: parseFloat(selectedReport.latitude.toString()),
-                      lng: parseFloat(selectedReport.longitude.toString()),
-                    }}
-                    defaultZoom={16}
-                    mapId="BANTAYBAYAN_MODAL_MAP"
+              <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <span
+                  role="status"
+                  aria-label={`Current status: ${getDisplayStatus(selectedReport.status)}`}
+                  className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+                    getDisplayStatus(selectedReport.status) === "pending"
+                      ? "bg-amber-100 text-amber-800"
+                      : getDisplayStatus(selectedReport.status) === "dispatched" ||
+                          getDisplayStatus(selectedReport.status) === "en route"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-emerald-100 text-emerald-800"
+                  }`}
+                >
+                  {getDisplayStatus(selectedReport.status) === "en route"
+                    ? "En Route"
+                    : getDisplayStatus(selectedReport.status)}
+                </span>
+                <div className="grid grid-cols-2 gap-2 sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openDispatchModal(selectedReport)
+                    }
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                      getFilterStatus(selectedReport.status) === "dispatched"
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
                   >
-                    <AdvancedMarker
-                      position={{
-                        lat: parseFloat(selectedReport.latitude.toString()),
-                        lng: parseFloat(selectedReport.longitude.toString()),
-                      }}
-                    />
-                  </Map>
-                </APIProvider>
+                    <LuTruck size={16} />
+                    Dispatch
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleStatusChange(selectedReport.id, "resolved")
+                    }
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                      getDisplayStatus(selectedReport.status) === "resolved"
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    }`}
+                  >
+                    <LuCircleCheck size={16} />
+                    Resolve
+                  </button>
+                </div>
               </div>
             </div>
-
           </div>
-        </div>
-      )}
+        </div>,
+        document.body,
+      ))}
+      {isEvidencePreviewOpen && selectedReport?.image_path &&
+        createPortal(
+          <div
+            className="web-modal-backdrop incident-evidence-preview-backdrop fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/95 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Incident evidence preview"
+            onClick={() => setIsEvidencePreviewOpen(false)}
+          >
+            <button
+              type="button"
+              aria-label="Close image preview"
+              onClick={() => setIsEvidencePreviewOpen(false)}
+              className="absolute right-4 top-4 z-[210] inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/40 bg-slate-900 text-white shadow-xl transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              <LuX size={28} />
+            </button>
+            <img
+              src={selectedReport.image_path || undefined}
+              alt="Incident evidence preview"
+              onClick={(event) => event.stopPropagation()}
+              className="incident-evidence-preview-image max-h-[90vh] max-w-[95vw] rounded-lg object-contain shadow-2xl"
+            />
+          </div>,
+          document.body,
+        )}
+      {dispatchReport &&
+        createPortal(
+          <div
+            className="web-modal-backdrop incident-evidence-preview-backdrop fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dispatch-responder-title"
+            onClick={() => setDispatchReport(null)}
+          >
+            <section
+              className="web-modal-panel incident-modal-panel w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                    Dispatch incident
+                  </p>
+                  <h2
+                    id="dispatch-responder-title"
+                    className="mt-1 text-xl font-bold text-slate-900"
+                  >
+                    Select a responder
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Choose a responder unit for {dispatchReport.emergency_type}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close dispatch modal"
+                  onClick={() => setDispatchReport(null)}
+                  className="cursor-pointer rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <LuX size={20} />
+                </button>
+              </header>
+
+              {isLoadingResponders ? (
+                <p
+                  role="status"
+                  className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"
+                >
+                  Loading available responders…
+                </p>
+              ) : responderLoadError ? (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-rose-200 bg-rose-50 p-4"
+                >
+                  <p className="text-sm text-rose-700">
+                    {responderLoadError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void fetchResponders()}
+                    className="mt-3 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-100"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : responders.length > 0 ? (
+                <div className="max-h-72 space-y-2 overflow-y-auto">
+                  {responders.map((responder) => {
+                    const responderId = String(responder.id);
+                    const isSelected = selectedResponderId === responderId;
+                    return (
+                      <button
+                        key={responder.id}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedResponderId(responderId)}
+                        className={`w-full cursor-pointer rounded-xl border p-3 text-left transition ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/20"
+                            : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="block font-semibold text-slate-900">
+                          {responder.first_name} {responder.last_name}
+                        </span>
+                        <span className="mt-1 block text-sm text-slate-500">
+                          {responder.contact_number || "No contact number"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  No responders are available to assign.
+                </p>
+              )}
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDispatchReport(null)}
+                  className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedResponderId}
+                  onClick={() => void confirmDispatch()}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <LuTruck size={16} />
+                  Dispatch
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

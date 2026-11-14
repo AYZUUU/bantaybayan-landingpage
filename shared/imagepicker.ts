@@ -1,10 +1,15 @@
 import * as ImagePicker from "expo-image-picker";
+import Toast from "react-native-toast-message";
 
 export const pickSource = async (setPhoto: (uri: string) => void) => {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
   if (status !== "granted") {
-    alert("Sorry, we need camera roll permissions to make this work!");
+    Toast.show({
+      type: "error",
+      text1: "Photo Permission Required",
+      text2: "Allow photo library access to choose an incident image.",
+    });
     return;
   }
 

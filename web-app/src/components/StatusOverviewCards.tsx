@@ -1,34 +1,58 @@
-import { LuCheck, LuTriangle,  } from "react-icons/lu";
+import { LuCheck, LuTriangle, LuTruck } from "react-icons/lu";
 
 interface StatusOverviewProps {
   reports: { status: string }[];
 }
 
 export default function StatusOverviewCards({ reports }: StatusOverviewProps) {
-  const pendingCount = reports.filter((r) => r.status === "pending").length;
-  const assignedCount = reports.filter((r) => r.status === "resolved").length;
+  const getDisplayStatus = (status: string) => {
+    const normalizedStatus = status.trim().toLowerCase();
+    if (normalizedStatus.includes("resolved")) return "resolved";
+    if (
+      normalizedStatus.includes("dispatched") ||
+      normalizedStatus.includes("en route")
+    ) return "dispatched";
+    return "pending";
+  };
+  const pendingCount = reports.filter(
+    (report) => getDisplayStatus(report.status) === "pending",
+  ).length;
+  const resolvedCount = reports.filter(
+    (report) => getDisplayStatus(report.status) === "resolved",
+  ).length;
+  const dispatchedCount = reports.filter(
+    (report) => getDisplayStatus(report.status) === "dispatched",
+  ).length;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 w-full max-w-4xl">
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 p-5 flex items-center border-l-4 border-l-yellow-500">
-        <div className="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
-          <LuTriangle size={28} />
+    <div className="mb-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="dashboard-stat-card dashboard-stat-pending flex min-h-28 items-center gap-4 rounded-2xl border border-amber-200/80 border-l-4 border-l-amber-400 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <div className="dashboard-stat-icon rounded-xl bg-amber-50 p-3 text-amber-600">
+          <LuTriangle size={23} />
         </div>
         <div>
-          <p className="text-sm text-slate-500 font-medium">Pending Reports</p>
-          <p className="text-2xl font-bold text-slate-800">{pendingCount}</p>
+          <p className="text-sm font-semibold text-slate-500">Pending</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{pendingCount}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 p-5 flex items-center border-l-4 border-l-emerald-500">
-        <div className="p-3 rounded-full bg-emerald-100 text-emerald-600 mr-4">
-          <LuCheck size={28} />
+      <div className="dashboard-stat-card dashboard-stat-dispatched flex min-h-28 items-center gap-4 rounded-2xl border border-blue-200/80 border-l-4 border-l-blue-500 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <div className="dashboard-stat-icon rounded-xl bg-blue-50 p-3 text-blue-600">
+          <LuTruck size={23} />
         </div>
         <div>
-          <p className="text-sm text-slate-500 font-medium">
-            Resolved Incidents
-          </p>
-          <p className="text-2xl font-bold text-slate-800">{assignedCount}</p>
+          <p className="text-sm font-semibold text-slate-500">Dispatched</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{dispatchedCount}</p>
+        </div>
+      </div>
+
+      <div className="dashboard-stat-card dashboard-stat-resolved flex min-h-28 items-center gap-4 rounded-2xl border border-emerald-200/80 border-l-4 border-l-emerald-500 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <div className="dashboard-stat-icon rounded-xl bg-emerald-50 p-3 text-emerald-600">
+          <LuCheck size={23} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-500">Resolved</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{resolvedCount}</p>
         </div>
       </div>
     </div>

@@ -1,7 +1,8 @@
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { MapView, Marker } from "./MapComponents";
+import OSMTileLayer, { OSM_ATTRIBUTION } from "./OSMTileLayer";
 
 interface LocationPopupProps {
   visible: boolean;
@@ -10,8 +11,11 @@ interface LocationPopupProps {
   location?: { latitude: number; longitude: number } | null;
   onLocationChange?: (loc: { latitude: number; longitude: number }) => void;
   isDraggable?: boolean;
+  showMap?: boolean;
+  isDark?: boolean;
   title?: string;
   buttonText?: string;
+  onAction?: () => void;
 }
 
 export default function LocationPopup({
@@ -21,30 +25,56 @@ export default function LocationPopup({
   location,
   onLocationChange,
   isDraggable = false,
+  showMap = true,
+  isDark = false,
   title = "Your Location",
   buttonText = "Close",
+  onAction,
 }: LocationPopupProps) {
   return (
     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, isDark && darkStyles.modalCard]}>
           <View style={styles.headerRow}>
-            <Text style={styles.titleText}>{title}</Text>
-            <Pressable onPress={onClose} style={styles.closeIconButton}>
-              <FontAwesome6 name="xmark" size={20} color="#4b5563" />
+            <Text style={[styles.titleText, isDark && darkStyles.titleText]}>
+              {title}
+            </Text>
+            <Pressable
+              onPress={onClose}
+              style={[
+                styles.closeIconButton,
+                isDark && darkStyles.closeIconButton,
+              ]}
+            >
+              <FontAwesome6
+                name="xmark"
+                size={20}
+                color={isDark ? "#cbd5e1" : "#4b5563"}
+              />
             </Pressable>
           </View>
 
           {isDraggable && (
-            <Text style={styles.instructionText}>
+            <Text
+              style={[
+                styles.instructionText,
+                isDark && darkStyles.instructionText,
+              ]}
+            >
               Hold and drag the marker to adjust your exact location.
             </Text>
           )}
 
-          {location && (
-            <View style={styles.mapContainer}>
+          {showMap && location && (
+            <View
+              style={[
+                styles.mapContainer,
+                isDark && darkStyles.mapContainer,
+              ]}
+            >
               <MapView
                 style={{ width: "100%", height: "100%" }}
+                mapType={Platform.OS === "android" ? "none" : "standard"}
                 initialRegion={{
                   latitude: location.latitude,
                   longitude: location.longitude,
@@ -54,8 +84,10 @@ export default function LocationPopup({
                 scrollEnabled={isDraggable}
                 zoomEnabled={isDraggable}
               >
+                <OSMTileLayer />
                 <Marker
                   coordinate={location}
+                  pinColor="#be123c"
                   draggable={isDraggable}
                   onDragEnd={(e) => {
                     if (onLocationChange) {
@@ -64,17 +96,36 @@ export default function LocationPopup({
                   }}
                 />
               </MapView>
+              <Text pointerEvents="none" style={styles.mapAttribution}>
+                {OSM_ATTRIBUTION}
+              </Text>
             </View>
           )}
 
-          <View style={styles.addressBox}>
-            <Text style={styles.addressLabel}>Location Data:</Text>
-            <Text style={styles.addressText} numberOfLines={2}>
+          <View style={[styles.addressBox, isDark && darkStyles.addressBox]}>
+            <Text
+              style={[
+                styles.addressLabel,
+                isDark && darkStyles.addressLabel,
+              ]}
+            >
+              Location Data:
+            </Text>
+            <Text
+              style={[
+                styles.addressText,
+                isDark && darkStyles.addressText,
+              ]}
+              numberOfLines={2}
+            >
               {address || "Fetching location..."}
             </Text>
           </View>
 
-          <Pressable onPress={onClose} style={styles.actionButton}>
+          <Pressable
+            onPress={onAction ?? onClose}
+            style={[styles.actionButton, isDark && darkStyles.actionButton]}
+          >
             <Text style={styles.actionButtonText}>{buttonText}</Text>
           </Pressable>
         </View>
@@ -132,6 +183,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     marginBottom: 16,
+    position: "relative",
+  },
+  mapAttribution: {
+    position: "absolute",
+    right: 6,
+    bottom: 22,
+    overflow: "hidden",
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    color: "#374151",
+    fontSize: 10,
   },
   addressBox: {
     backgroundColor: "#F9FAFB",
@@ -153,7 +217,7 @@ const styles = StyleSheet.create({
     color: "#1F2937",
   },
   actionButton: {
-    backgroundColor: "#000000",
+    backgroundColor: "#166534",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -166,4 +230,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 18,
   },
+});
+
+const darkStyles = StyleSheet.create({
+  modalCard: {
+    backgroundColor: "#1e293b",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  titleText: { color: "#f8fafc" },
+  closeIconButton: { backgroundColor: "#334155" },
+  instructionText: { color: "#cbd5e1" },
+  mapContainer: { borderColor: "#334155" },
+  addressBox: { backgroundColor: "#0f172a", borderColor: "#334155" },
+  addressLabel: { color: "#cbd5e1" },
+  addressText: { color: "#f8fafc" },
+  actionButton: { backgroundColor: "#15803d" },
 });
