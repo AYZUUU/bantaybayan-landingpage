@@ -188,10 +188,6 @@ export default function LandingPage({ adminUrl, apkUrl }: LandingPageProps) {
             </div>
             <div className="landing-hero-visual">
               <MapPreview />
-              <div className="landing-hero-stamp" aria-hidden="true">
-                <LuShieldCheck />
-                <span>PEOPLE<br />FIRST</span>
-              </div>
             </div>
           </div>
           <div className="landing-hero-bottom" aria-hidden="true" />
