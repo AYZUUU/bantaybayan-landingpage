@@ -869,6 +869,9 @@
   font-size: 12px;
   line-height: 1.75;
 }
+.landing-steps-action {
+  margin-top: 48px;
+}
 .landing-features-section {
   background: #e9eee4;
   padding: 88px 0;

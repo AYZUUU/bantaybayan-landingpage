@@ -303,11 +303,7 @@ function TutorialModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
   );
 }
 
-type LandingPageProps = {
-  adminUrl?: string;
-};
-
-export default function LandingPage({ adminUrl }: LandingPageProps) {
+export default function LandingPage() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -333,11 +329,6 @@ export default function LandingPage({ adminUrl }: LandingPageProps) {
           <nav className="landing-nav" aria-label="Main navigation">
             <a href="#how-it-works">How it works</a>
             <a href="#features">Features</a>
-            {adminUrl && (
-              <a href={adminUrl} className="landing-nav-admin">
-                Admin portal <LuArrowUpRight aria-hidden="true" />
-              </a>
-            )}
           </nav>
         </div>
       </header>
@@ -362,14 +353,6 @@ export default function LandingPage({ adminUrl }: LandingPageProps) {
                 <a className="landing-button landing-button-primary" href="#how-it-works">
                   See how it works <LuArrowRight aria-hidden="true" />
                 </a>
-                <button className="landing-button landing-button-tutorial" onClick={() => setShowTutorial(true)}>
-                  Watch Tutorial <LuPlay aria-hidden="true" />
-                </button>
-                {adminUrl && (
-                  <a className="landing-button landing-button-secondary" href={adminUrl}>
-                    Admin sign in <LuArrowUpRight aria-hidden="true" />
-                  </a>
-                )}
               </div>
               <p className="landing-hero-caption">
                 A community response platform for Ilocos Sur.
@@ -424,6 +407,11 @@ export default function LandingPage({ adminUrl }: LandingPageProps) {
                 </article>
               ))}
             </div>
+            <div className="landing-steps-action" style={{ textAlign: 'center', marginTop: '48px' }}>
+              <button className="landing-button landing-button-tutorial" onClick={() => setShowTutorial(true)}>
+                Watch Tutorial <LuPlay aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </section>
 
@@ -474,11 +462,6 @@ export default function LandingPage({ adminUrl }: LandingPageProps) {
                 <h2>Connected communities start with a clear signal.</h2>
                 <p>Learn more about the community response flow.</p>
               </div>
-              {adminUrl && (
-                <a className="landing-button landing-button-light" href={adminUrl}>
-                  Open admin portal <LuArrowRight aria-hidden="true" />
-                </a>
-              )}
             </div>
           </div>
         </section>
