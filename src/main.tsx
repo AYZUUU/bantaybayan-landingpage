@@ -10,9 +10,10 @@ if (!rootElement) {
 }
 
 const adminUrl = import.meta.env.VITE_ADMIN_URL?.trim();
+const apkUrl = import.meta.env.VITE_APK_URL?.trim();
 
 createRoot(rootElement).render(
   <StrictMode>
-    <LandingPage adminUrl={adminUrl || undefined} />
+    <LandingPage adminUrl={adminUrl || undefined} apkUrl={apkUrl || undefined} />
   </StrictMode>,
 );

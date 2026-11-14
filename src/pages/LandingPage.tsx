@@ -2,6 +2,7 @@ import {
   LuArrowRight,
   LuArrowUpRight,
   LuBell,
+  LuDownload,
   LuMapPin,
   LuMessageSquareText,
   LuShieldCheck,
@@ -121,9 +122,10 @@ function MapPreview() {
 
 type LandingPageProps = {
   adminUrl?: string;
+  apkUrl?: string;
 };
 
-export default function LandingPage({ adminUrl }: LandingPageProps) {
+export default function LandingPage({ adminUrl, apkUrl }: LandingPageProps) {
   return (
     <div className="landing-page" id="top">
       <header className="landing-header">
@@ -166,7 +168,12 @@ export default function LandingPage({ adminUrl }: LandingPageProps) {
                 response teams a shared place to review incidents and coordinate.
               </p>
               <div className="landing-hero-actions">
-                <a className="landing-button landing-button-primary" href="#how-it-works">
+                {apkUrl && (
+                  <a className="landing-button landing-button-primary" href={apkUrl}>
+                    Download for Android <LuDownload aria-hidden="true" />
+                  </a>
+                )}
+                <a className={`landing-button ${apkUrl ? "landing-button-secondary" : "landing-button-primary"}`} href="#how-it-works">
                   See how it works <LuArrowRight aria-hidden="true" />
                 </a>
                 {adminUrl && (

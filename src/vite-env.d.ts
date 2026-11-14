@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_ADMIN_URL?: string;
+  readonly VITE_APK_URL?: string;
 }
 
 interface ImportMeta {
