@@ -7,7 +7,12 @@ import {
   LuShieldCheck,
   LuSmartphone,
   LuUsers,
+  LuX,
+  LuChevronRight,
+  LuChevronLeft,
+  LuPlay,
 } from "react-icons/lu";
+import { useState } from "react";
 import brandLogo from "../assets/bantaybayan.png";
 import "./LandingPage.css";
 
@@ -23,7 +28,7 @@ const responseSteps = [
     number: "02",
     title: "Review the details",
     description:
-      "Authorized staff can review incoming incidents and see location information on the dashboard.",
+      "Authorized staff can review incoming incidents and see locfation information on the dashboard.",
     icon: LuMapPin,
   },
   {
@@ -53,6 +58,57 @@ const features = [
     description:
       "Authorized staff can assign responders, track status changes, and receive alerts.",
     icon: LuBell,
+  },
+];
+
+const tutorialSteps = [
+  {
+    id: 1,
+    title: "Open the App",
+    description: "Launch BantayBayan on your phone to get started.",
+    icon: LuSmartphone,
+  },
+  {
+    id: 2,
+    title: "Tap Report Emergency",
+    description: "Click the prominent 'Report Emergency' button on the home screen.",
+    icon: LuMessageSquareText,
+  },
+  {
+    id: 3,
+    title: "Select Emergency Type",
+    description: "Choose from available emergency categories like medical, fire, or accident.",
+    icon: LuBell,
+  },
+  {
+    id: 4,
+    title: "Set Severity Level",
+    description: "Indicate how urgent the situation is (Low, Medium, High, Critical).",
+    icon: LuMapPin,
+  },
+  {
+    id: 5,
+    title: "Add Your Location",
+    description: "Allow location access or manually enter where help is needed.",
+    icon: LuMapPin,
+  },
+  {
+    id: 6,
+    title: "Provide Details",
+    description: "Add your contact number, name, and any additional emergency details.",
+    icon: LuMessageSquareText,
+  },
+  {
+    id: 7,
+    title: "Submit Report",
+    description: "Hit submit to send your report to response teams in your area.",
+    icon: LuArrowRight,
+  },
+  {
+    id: 8,
+    title: "Track Response",
+    description: "Monitor your report status and receive updates as responders are dispatched.",
+    icon: LuUsers,
   },
 ];
 
@@ -119,16 +175,153 @@ function MapPreview() {
   );
 }
 
+function WelcomeModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="landing-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title">
+      <div className="landing-modal" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="landing-modal-close"
+          onClick={onClose}
+          aria-label="Close welcome modal"
+        >
+          <LuX aria-hidden="true" />
+        </button>
+        <div className="landing-modal-content">
+          <h2 id="welcome-modal-title">Welcome to BantayBayan</h2>
+          <p className="landing-modal-tagline">
+            Your community's safety starts here. We're building a faster, clearer way for people to share emergencies and response teams to coordinate help.
+          </p>
+          <p className="landing-modal-description">
+            When every second counts, BantayBayan connects your community. Whether you're reporting an emergency or coordinating a response, our platform makes it simple to get help where it's needed most.
+          </p>
+          <button className="landing-modal-action" onClick={onClose}>
+            Let's get started <LuArrowRight aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TutorialModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const step = tutorialSteps[currentStep];
+  const Icon = step.icon;
+
+  const nextStep = () => {
+    if (currentStep < tutorialSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const goToStep = (stepNum: number) => {
+    setCurrentStep(stepNum);
+  };
+
+  const handleClose = () => {
+    setCurrentStep(0);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="landing-modal-overlay" onClick={handleClose} role="dialog" aria-modal="true" aria-labelledby="tutorial-modal-title">
+      <div className="landing-modal landing-tutorial-modal" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="landing-modal-close"
+          onClick={handleClose}
+          aria-label="Close tutorial"
+        >
+          <LuX aria-hidden="true" />
+        </button>
+        <div className="landing-tutorial-content">
+          <div className="landing-tutorial-header">
+            <h2 id="tutorial-modal-title">How to Report an Emergency</h2>
+            <p className="landing-tutorial-counter">
+              Step {currentStep + 1} of {tutorialSteps.length}
+            </p>
+          </div>
+
+          <div className="landing-tutorial-step">
+            <div className="landing-tutorial-icon">
+              <Icon aria-hidden="true" />
+            </div>
+            <div className="landing-tutorial-text">
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+            </div>
+          </div>
+
+          <div className="landing-tutorial-dots">
+            {tutorialSteps.map((_, idx) => (
+              <button
+                key={idx}
+                className={`landing-tutorial-dot ${idx === currentStep ? 'active' : ''}`}
+                onClick={() => goToStep(idx)}
+                aria-label={`Go to step ${idx + 1}`}
+                aria-current={idx === currentStep ? 'step' : undefined}
+              />
+            ))}
+          </div>
+
+          <div className="landing-tutorial-actions">
+            <button
+              className="landing-tutorial-nav-button"
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              aria-label="Previous step"
+            >
+              <LuChevronLeft aria-hidden="true" /> Previous
+            </button>
+            
+            {currentStep === tutorialSteps.length - 1 ? (
+              <button className="landing-tutorial-finish" onClick={handleClose}>
+                Got it! <LuArrowRight aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                className="landing-tutorial-nav-button"
+                onClick={nextStep}
+                aria-label="Next step"
+              >
+                Next <LuChevronRight aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type LandingPageProps = {
   adminUrl?: string;
 };
 
 export default function LandingPage({ adminUrl }: LandingPageProps) {
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+
   return (
     <div className="landing-page" id="top">
+      <WelcomeModal isOpen={showWelcome} onClose={() => setShowWelcome(false)} />
+      <TutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
+      
       <header className="landing-header">
         <div className="landing-header-inner">
-          <a className="landing-brand" href="#top" aria-label="BantayBayan home">
+          <a className="landing-brand" href="#top" aria-label="BantayBayan home" onClick={(e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}>
             <span className="landing-brand-mark">
               <img src={brandLogo} alt="" />
             </span>
@@ -169,6 +362,9 @@ export default function LandingPage({ adminUrl }: LandingPageProps) {
                 <a className="landing-button landing-button-primary" href="#how-it-works">
                   See how it works <LuArrowRight aria-hidden="true" />
                 </a>
+                <button className="landing-button landing-button-tutorial" onClick={() => setShowTutorial(true)}>
+                  Watch Tutorial <LuPlay aria-hidden="true" />
+                </button>
                 {adminUrl && (
                   <a className="landing-button landing-button-secondary" href={adminUrl}>
                     Admin sign in <LuArrowUpRight aria-hidden="true" />

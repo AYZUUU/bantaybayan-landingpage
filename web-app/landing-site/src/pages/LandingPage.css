@@ -112,6 +112,248 @@
   width: 15px;
   height: 15px;
 }
+.landing-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: #00000066;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.landing-modal {
+  background: #fff;
+  border-radius: 24px;
+  position: relative;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px #00000030;
+  animation: slideUp 0.3s ease-out;
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.landing-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--landing-ink);
+  transition: background-color 0.16s;
+}
+.landing-modal-close:hover {
+  background: #e8e8e8;
+}
+.landing-modal-close svg {
+  width: 20px;
+  height: 20px;
+}
+.landing-modal-content {
+  padding: 48px 40px;
+  text-align: center;
+}
+.landing-modal-content h2 {
+  color: var(--landing-ink);
+  letter-spacing: -0.04em;
+  margin: 0 0 18px;
+  font-size: 2rem;
+  font-weight: 750;
+}
+.landing-modal-tagline {
+  color: var(--landing-green);
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.landing-modal-description {
+  color: var(--landing-muted);
+  margin: 0 0 28px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.landing-modal-action {
+  background: var(--landing-lime);
+  color: #16352c;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    background-color 0.16s,
+    transform 0.16s;
+}
+.landing-modal-action:hover {
+  background: #e0f0c4;
+  transform: translateY(-2px);
+}
+.landing-modal-action svg {
+  width: 16px;
+  height: 16px;
+}
+.landing-tutorial-modal {
+  max-width: 550px;
+}
+.landing-tutorial-content {
+  padding: 48px 40px;
+}
+.landing-tutorial-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.landing-tutorial-header h2 {
+  color: var(--landing-ink);
+  letter-spacing: -0.04em;
+  margin: 0 0 8px;
+  font-size: 1.8rem;
+  font-weight: 750;
+}
+.landing-tutorial-counter {
+  color: var(--landing-green);
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.landing-tutorial-step {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 32px;
+  align-items: flex-start;
+}
+.landing-tutorial-icon {
+  color: var(--landing-green);
+  background: #e8f1df;
+  border-radius: 16px;
+  flex: none;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  display: grid;
+}
+.landing-tutorial-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.landing-tutorial-text h3 {
+  color: var(--landing-ink);
+  letter-spacing: -0.03em;
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 750;
+}
+.landing-tutorial-text p {
+  color: var(--landing-muted);
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.landing-tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.landing-tutorial-dot {
+  background: #e8e8e8;
+  border: none;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  cursor: pointer;
+  transition: background-color 0.16s;
+}
+.landing-tutorial-dot:hover {
+  background: #d4d4d4;
+}
+.landing-tutorial-dot.active {
+  background: var(--landing-green);
+}
+.landing-tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.landing-tutorial-nav-button {
+  background: transparent;
+  color: var(--landing-ink);
+  border: 1px solid #dfe4dc;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.16s;
+}
+.landing-tutorial-nav-button:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #c8ccc5;
+}
+.landing-tutorial-nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.landing-tutorial-nav-button svg {
+  width: 14px;
+  height: 14px;
+}
+.landing-tutorial-finish {
+  background: var(--landing-lime);
+  color: #16352c;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition:
+    background-color 0.16s,
+    transform 0.16s;
+}
+.landing-tutorial-finish:hover {
+  background: #e0f0c4;
+  transform: translateY(-2px);
+}
+.landing-tutorial-finish svg {
+  width: 14px;
+  height: 14px;
+}
 .landing-hero {
   isolation: isolate;
   color: #fff;
@@ -250,6 +492,13 @@
   background: #ffffff12;
   border-color: #ffffff80;
 }
+.landing-button-tutorial {
+  background: var(--landing-green);
+  color: #fff;
+}
+.landing-button-tutorial:hover {
+  background: var(--landing-green-dark);
+}
 .landing-hero-caption {
   color: #ffffff75;
   margin: 21px 0 0;
@@ -263,7 +512,7 @@
 }
 .landing-preview {
   color: var(--landing-ink);
-  background: #fafbf7;
+  background: #b3d844;
   border: 1px solid #ffffff85;
   border-radius: 22px;
   position: relative;
@@ -864,6 +1113,72 @@
   }
   .landing-nav .landing-nav-admin {
     padding: 9px 12px;
+    font-size: 11px;
+  }
+  .landing-modal {
+    width: 85%;
+    max-width: 420px;
+  }
+  .landing-modal-close {
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+  }
+  .landing-modal-content {
+    padding: 36px 24px;
+  }
+  .landing-modal-content h2 {
+    font-size: 1.5rem;
+    margin-bottom: 14px;
+  }
+  .landing-modal-tagline {
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+  .landing-modal-description {
+    font-size: 13px;
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+  .landing-tutorial-modal {
+    max-width: 480px;
+  }
+  .landing-tutorial-content {
+    padding: 36px 24px;
+  }
+  .landing-tutorial-header h2 {
+    font-size: 1.4rem;
+    margin-bottom: 6px;
+  }
+  .landing-tutorial-counter {
+    font-size: 11px;
+  }
+  .landing-tutorial-step {
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .landing-tutorial-icon {
+    border-radius: 14px;
+    width: 52px;
+    height: 52px;
+  }
+  .landing-tutorial-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+  .landing-tutorial-text h3 {
+    font-size: 1rem;
+  }
+  .landing-tutorial-text p {
+    font-size: 12px;
+  }
+  .landing-tutorial-actions {
+    gap: 8px;
+  }
+  .landing-tutorial-nav-button,
+  .landing-tutorial-finish {
+    padding: 8px 14px;
     font-size: 11px;
   }
   .landing-hero {
