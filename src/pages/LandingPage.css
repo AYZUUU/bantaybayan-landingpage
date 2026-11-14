@@ -112,6 +112,156 @@
   width: 15px;
   height: 15px;
 }
+.landing-modal {
+  color: var(--landing-ink);
+  background: #fff;
+  border: 0;
+  border-radius: 24px;
+  width: min(90%, 550px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  box-shadow: 0 20px 60px #00000030;
+}
+.landing-modal::backdrop {
+  background: #00000099;
+}
+.landing-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--landing-ink);
+  background: #f0f3ea;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.landing-modal-close svg,
+.landing-modal-action svg,
+.landing-tutorial-nav svg {
+  width: 16px;
+  height: 16px;
+}
+.landing-modal-content,
+.landing-tutorial-content {
+  padding: 64px 40px 40px;
+}
+.landing-modal-content,
+.landing-tutorial-header {
+  text-align: center;
+}
+.landing-modal-content h2,
+.landing-tutorial-header h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.04em;
+}
+.landing-modal-tagline {
+  color: var(--landing-green-dark);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.landing-modal-description,
+.landing-tutorial-step p {
+  color: var(--landing-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.landing-modal-action,
+.landing-tutorial-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.landing-modal-action {
+  color: #16352c;
+  background: var(--landing-lime);
+}
+.landing-tutorial-header > p {
+  color: var(--landing-green-dark);
+  font-size: 12px;
+  font-weight: 600;
+}
+.landing-tutorial-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin: 30px 0;
+}
+.landing-tutorial-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  color: var(--landing-green-dark);
+  background: #e8f1df;
+  border-radius: 16px;
+}
+.landing-tutorial-icon svg {
+  width: 26px;
+  height: 26px;
+}
+.landing-tutorial-step h3,
+.landing-tutorial-step p {
+  margin: 0 0 8px;
+}
+.landing-tutorial-dots {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.landing-tutorial-dot {
+  width: 32px;
+  height: 32px;
+  padding: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: #d3ddd3 content-box;
+  cursor: pointer;
+}
+.landing-tutorial-dot.active {
+  background-color: var(--landing-green-dark);
+}
+.landing-tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.landing-tutorial-nav {
+  color: var(--landing-ink);
+  background: #eef2ea;
+}
+.landing-tutorial-nav:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.landing-modal button:focus-visible {
+  outline: 3px solid var(--landing-green-dark);
+  outline-offset: 3px;
+}
+.landing-steps-action {
+  margin-top: 48px;
+  text-align: center;
+}
+.landing-button-tutorial {
+  color: #fff;
+  background: var(--landing-green-dark);
+  cursor: pointer;
+}
+.landing-button-tutorial:hover {
+  background: #173a32;
+}
 .landing-hero {
   isolation: isolate;
   color: #fff;
@@ -808,6 +958,10 @@
   }
 }
 @media (width<=680px) {
+  .landing-modal-content,
+  .landing-tutorial-content {
+    padding: 64px 24px 28px;
+  }
   .landing-container {
     width: min(100% - 36px, 520px);
   }

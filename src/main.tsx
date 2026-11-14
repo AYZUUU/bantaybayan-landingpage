@@ -9,11 +9,10 @@ if (!rootElement) {
   throw new Error("Landing page root element was not found.");
 }
 
-const adminUrl = import.meta.env.VITE_ADMIN_URL?.trim();
 const apkUrl = import.meta.env.VITE_APK_URL?.trim();
 
 createRoot(rootElement).render(
   <StrictMode>
-    <LandingPage adminUrl={adminUrl || undefined} apkUrl={apkUrl || undefined} />
+    <LandingPage apkUrl={apkUrl || undefined} />
   </StrictMode>,
 );
