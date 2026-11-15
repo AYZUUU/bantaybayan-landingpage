@@ -335,15 +335,15 @@ export default function LandingPage({ apkUrl }: LandingPageProps) {
                     <span>{number}</span>
                     <Icon aria-hidden="true" />
                   </div>
-                  <div className="landing-steps-action">
-                    <button type="button" className="landing-button landing-button-tutorial" onClick={() => setShowTutorial(true)}>
-                      Watch Tutorial <LuPlay aria-hidden="true" />
-                    </button>
-                  </div>
                   <h3>{title}</h3>
                   <p>{description}</p>
                 </article>
               ))}
+            </div>
+            <div className="landing-steps-action">
+              <button type="button" className="landing-button landing-button-tutorial" onClick={() => setShowTutorial(true)}>
+                Watch Tutorial <LuPlay aria-hidden="true" />
+              </button>
             </div>
           </div>
         </section>
