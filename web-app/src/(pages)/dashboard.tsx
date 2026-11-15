@@ -17,6 +17,7 @@ import {
 } from "react-icons/lu";
 import type { Report } from "../components/AdminLayout";
 import IncidentMap from "../components/IncidentMap";
+import ReporterIdPhoto from "../components/ReporterIdPhoto";
 import StatusOverviewCards from "../components/StatusOverviewCards";
 import { ILOCOS_SUR_BOUNDARIES } from "../utils/municipalityBoundaries";
 import type { MunicipalityOption } from "../utils/municipalities";
@@ -524,18 +525,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {activeReport.user_id_photo && (
-                    <div>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Reporter identification
-                      </h3>
-                      <img
-                        src={activeReport.user_id_photo}
-                        alt="Reporter identification document"
-                        className="max-h-52 w-full rounded-xl border border-slate-200 bg-slate-50 object-contain"
-                      />
-                    </div>
-                  )}
+                  <ReporterIdPhoto userId={activeReport.user_id} />
                 </div>
 
                 <div>

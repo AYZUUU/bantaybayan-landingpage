@@ -3,6 +3,7 @@ import { getCachedSignedStorageUrl } from "./storageUrls";
 
 export interface AdminReport {
   id: number;
+  user_id: string | null;
   emergency_type: string | null;
   accident_level: string | null;
   reporter_name: string | null;
@@ -42,7 +43,19 @@ function notifyReportEvent(
 }
 
 const BASE_REPORT_COLUMNS =
-  "id, emergency_type, accident_level, reporter_name, contact_number, description, latitude, longitude, municipality, province, status, created_at, image_path, assigned_responder_id";
+  "id, user_id, emergency_type, accident_level, reporter_name, contact_number, description, latitude, longitude, municipality, province, status, created_at, image_path, assigned_responder_id";
+
+export async function getReporterIdPhoto(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id_photo_path")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load reporter identification: ${error.message}`);
+  if (!data) throw new Error("Reporter account is unavailable.");
+  if (!data.id_photo_path) return null;
+  return getCachedSignedStorageUrl("id-photos", data.id_photo_path);
+}
 
 export async function getAdminReports(): Promise<AdminReport[]> {
   let { data, error } = await supabase

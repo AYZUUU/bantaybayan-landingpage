@@ -8,7 +8,7 @@ import {
   LuCircleAlert,
   LuLoaderCircle
 } from "react-icons/lu";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabase";
 import {
   getVerifiedTotpFactor,
@@ -18,6 +18,7 @@ import {
   verifyNewTotpFactor,
 } from "../../../shared/totpMfa";
 import "./index.css";
+import { safeNotificationReturnPath } from "../utils/notificationTargets";
 
 interface AdminProfile {
   id: string;
@@ -44,6 +45,7 @@ export default function Login() {
   } | null>(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const finishLogin = (profile: AdminProfile, accountEmail?: string) => {
     const safeRole = profile.role.toLowerCase().trim();
@@ -64,7 +66,8 @@ export default function Login() {
     } else {
       localStorage.removeItem("userAvatarUrl");
     }
-    navigate(safeRole === "superadmin" ? "/superadmin" : "/dashboard");
+    const destination = safeNotificationReturnPath(location.state?.from, safeRole);
+    navigate(destination || (safeRole === "superadmin" ? "/superadmin" : "/dashboard"));
   };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {

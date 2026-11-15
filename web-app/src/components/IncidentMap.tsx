@@ -6,7 +6,7 @@ import * as L from "leaflet";
 import { divIcon } from "leaflet";
 import type { MarkerCluster } from "leaflet";
 import type { FeatureCollection, Geometry } from "geojson";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import {
   AttributionControl,
@@ -17,6 +17,7 @@ import {
   TileLayer,
   useMap,
 } from "react-leaflet";
+import { listenForClusterTaps } from "../utils/clusterTouch";
 
 export interface IncidentMapMarker {
   id: string | number;
@@ -94,20 +95,43 @@ function createIncidentIcon(status?: string, animationClass = "") {
   });
 }
 
-function createIncidentClusterIcon(cluster: MarkerCluster) {
+function createIncidentClusterIcon(
+  cluster: MarkerCluster,
+  onExpand: (cluster: MarkerCluster) => boolean,
+) {
   const count = cluster.getChildCount();
   const size = count < 10 ? "small" : count < 100 ? "medium" : "large";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = String(count);
+  button.setAttribute("aria-label", `Expand ${count} incidents`);
+  button.setAttribute("aria-expanded", "false");
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onExpand(cluster);
+  });
+  cluster.options.keyboard = false;
 
   return divIcon({
-    html: `<span aria-label="Expand ${count} incidents" aria-expanded="false">${count}</span>`,
+    html: button,
     className: `marker-cluster marker-cluster-${size} incident-map-cluster`,
     iconSize: [40, 40],
   });
 }
 
-function createExpandedClusterIcon(count: number, closing: boolean) {
+function createExpandedClusterIcon(count: number, closing: boolean, onCollapse: () => void) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = `${count} ×`;
+  button.setAttribute("aria-label", `Collapse ${count} incidents`);
+  button.setAttribute("aria-expanded", "true");
+  button.disabled = closing;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onCollapse();
+  });
   return divIcon({
-    html: `<span aria-label="Collapse ${count} incidents" aria-expanded="true">${count}<span aria-hidden="true">×</span></span>`,
+    html: button,
     className: `incident-map-expanded-cluster${closing ? " incident-map-marker-exit" : ""}`,
     iconSize: [48, 48],
     iconAnchor: [24, 24],
@@ -233,8 +257,8 @@ function ExpandedClusterMarkers({
       })}
       <Marker
         position={expandedCluster.center}
-        icon={createExpandedClusterIcon(count, closing)}
-        keyboard
+        icon={createExpandedClusterIcon(count, closing, onCollapse)}
+        keyboard={false}
         title={`Collapse ${count} incidents`}
         eventHandlers={{ click: closing ? undefined : onCollapse }}
       />
@@ -301,6 +325,37 @@ function MapResizeHandler() {
       cancelAnimationFrame(frame);
     };
   }, [map]);
+
+  return null;
+}
+
+function ClusterTouchHandler({
+  groupRef,
+  onExpand,
+  onCollapse,
+}: {
+  groupRef: React.RefObject<L.MarkerClusterGroup | null>;
+  onExpand: (cluster: MarkerCluster) => boolean;
+  onCollapse: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => listenForClusterTaps(map.getContainer(), (element) => {
+    if (element.classList.contains("incident-map-expanded-cluster")) {
+      onCollapse();
+      return true;
+    }
+    const group = groupRef.current;
+    if (!group) return false;
+    for (const layer of group.getLayers()) {
+      if (!(layer instanceof L.Marker)) continue;
+      const parent = group.getVisibleParent(layer);
+      if (parent instanceof L.MarkerCluster && parent.getElement() === element) {
+        return onExpand(parent);
+      }
+    }
+    return false;
+  }), [map, groupRef, onExpand, onCollapse]);
 
   return null;
 }
@@ -381,6 +436,35 @@ export default function IncidentMap({
 }: IncidentMapProps) {
   const [expandedCluster, setExpandedCluster] =
     useState<ExpandedCluster | null>(null);
+  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersRef = useRef(markers);
+  useEffect(() => {
+    markersRef.current = markers;
+  }, [markers]);
+  const collapseCluster = useCallback(() => {
+    setExpandedCluster((current) =>
+      current ? { ...current, closing: true } : null,
+    );
+  }, []);
+  const expandCluster = useCallback((cluster: MarkerCluster) => {
+    const markersByAlt = new Map(
+      markersRef.current.map((marker) => [getIncidentMarkerAlt(marker), marker]),
+    );
+    const clusterMarkers = cluster.getAllChildMarkers().flatMap((childMarker) => {
+      const marker = childMarker.options.alt
+        ? markersByAlt.get(childMarker.options.alt)
+        : undefined;
+      return marker ? [marker] : [];
+    });
+    if (clusterMarkers.length <= 1) return false;
+    const clusterCenter = cluster.getLatLng();
+    setExpandedCluster({
+      markerIds: clusterMarkers.map((marker) => marker.id),
+      center: [clusterCenter.lat, clusterCenter.lng],
+      closing: false,
+    });
+    return true;
+  }, []);
   useEffect(() => {
     if (!expandedCluster?.closing) return;
 
@@ -423,6 +507,7 @@ export default function IncidentMap({
     >
       <MapViewUpdater center={center} zoom={zoom} />
       <MapResizeHandler />
+      <ClusterTouchHandler groupRef={clusterGroupRef} onExpand={expandCluster} onCollapse={collapseCluster} />
       <MapMarkerBoundsUpdater markers={markers} enabled={autoFitMarkers} />
       <MapBoundaryBoundsUpdater
         boundaries={highlightedBoundaries}
@@ -447,35 +532,15 @@ export default function IncidentMap({
         />
       )}
       <MarkerClusterGroup
+        ref={clusterGroupRef}
         chunkedLoading
         maxClusterRadius={50}
         showCoverageOnHover={false}
         spiderfyOnMaxZoom={false}
         zoomToBoundsOnClick={false}
-        iconCreateFunction={createIncidentClusterIcon}
+        iconCreateFunction={(cluster) => createIncidentClusterIcon(cluster, expandCluster)}
         onClick={(event) => {
-          if (!(event.layer instanceof L.MarkerCluster)) return;
-
-          const markersByAlt = new Map(
-            markers.map((marker) => [getIncidentMarkerAlt(marker), marker]),
-          );
-          const clusterMarkers = event.layer
-            .getAllChildMarkers()
-            .flatMap((childMarker) => {
-              const marker = childMarker.options.alt
-                ? markersByAlt.get(childMarker.options.alt)
-                : undefined;
-              return marker ? [marker] : [];
-            });
-          const clusterCenter = event.layer.getLatLng();
-
-          if (clusterMarkers.length > 1) {
-            setExpandedCluster({
-              markerIds: clusterMarkers.map((marker) => marker.id),
-              center: [clusterCenter.lat, clusterCenter.lng],
-              closing: false,
-            });
-          }
+          if (event.layer instanceof L.MarkerCluster) expandCluster(event.layer);
         }}
       >
         {markers
@@ -497,11 +562,7 @@ export default function IncidentMap({
           expandedCluster={visibleExpandedCluster}
           markers={expandedMarkers}
           closing={visibleExpandedCluster.closing}
-          onCollapse={() =>
-            setExpandedCluster((current) =>
-              current ? { ...current, closing: true } : null,
-            )
-          }
+          onCollapse={collapseCluster}
           onMarkerClick={onMarkerClick}
         />
       )}

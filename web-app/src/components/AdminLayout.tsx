@@ -1,14 +1,16 @@
 import { useEffect, useState, useRef } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { LuMenu } from "react-icons/lu";
 import Sidebar from "./Sidebar";
 import { supabase } from "../utils/supabase";
 import { getAdminReports } from "../utils/reports";
 import { ILOCOS_SUR_MUNICIPALITIES } from "../utils/municipalities";
+import { accountNotificationPath, reportNotificationPath } from "../utils/notificationTargets";
 
 export interface Report {
   id: number;
+  user_id: string | null;
   accident_type: string;
   emergency_type?: string;
   description?: string | null;
@@ -25,7 +27,6 @@ export interface Report {
   reporter_name: string;
   contact_number?: string | null;
   email?: string | null;
-  user_id_photo?: string | null;
   assigned_responder_id?: string | null;
 }
 
@@ -34,6 +35,7 @@ export default function AdminLayout() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const [reports, setReports] = useState<Report[]>([]);
@@ -146,6 +148,7 @@ export default function AdminLayout() {
       try {
         const fetchedReports = (await getAdminReports()).map((report) => ({
           id: report.id,
+          user_id: report.user_id,
           accident_type: report.emergency_type || "Incident",
           emergency_type: report.emergency_type || "Incident",
           description: report.description,
@@ -175,7 +178,14 @@ export default function AdminLayout() {
               !backupAlertedRef.current.has(report.id)
             ) {
               toast.error(
-                `BACKUP REQUESTED: ${report.accident_type} (#${report.id}) needs more responders.`,
+                (notification) => (
+                  <button type="button" className="text-left" onClick={() => {
+                    toast.dismiss(notification.id);
+                    navigate(reportNotificationPath(report.id));
+                  }}>
+                    BACKUP REQUESTED: {report.accident_type} (#{report.id}) needs more responders. View report
+                  </button>
+                ),
                 { duration: 10000 },
               );
               if (
@@ -184,13 +194,18 @@ export default function AdminLayout() {
                 Notification.permission === "granted"
               ) {
                 try {
-                  new Notification("Backup requested", {
+                  const notification = new Notification("Backup requested", {
                     body: `${report.accident_type} (#${report.id}) needs more responders.${
                       report.backup_note ? ` ${report.backup_note}` : ""
                     }`,
                     icon: "/favicon.ico",
                     tag: `backup-${report.id}`,
                   });
+                  notification.onclick = () => {
+                    window.focus();
+                    navigate(reportNotificationPath(report.id));
+                    notification.close();
+                  };
                 } catch (error) {
                   console.error("Error displaying browser notification:", error);
                 }
@@ -215,7 +230,14 @@ export default function AdminLayout() {
             latestId > lastReportIdRef.current
           ) {
             toast.error(
-              `NEW EMERGENCY: ${latestReport.accident_type} reported by ${latestReport.reporter_name}!`, 
+              (notification) => (
+                <button type="button" className="text-left" onClick={() => {
+                  toast.dismiss(notification.id);
+                  navigate(reportNotificationPath(latestReport.id));
+                }}>
+                  NEW EMERGENCY: {latestReport.accident_type} reported by {latestReport.reporter_name}! View report
+                </button>
+              ),
               {
                 duration: 8000,
                 style: { minWidth: '350px', fontWeight: 'bold', fontSize: '16px' },
@@ -228,11 +250,16 @@ export default function AdminLayout() {
             Notification.permission === "granted"
           ) {
             try {
-              new Notification("New emergency report", {
+              const notification = new Notification("New emergency report", {
                 body: `${latestReport.accident_type} reported by ${latestReport.reporter_name}.`,
                 icon: "/favicon.ico",
                 tag: `report-${latestReport.id}`,
               });
+              notification.onclick = () => {
+                window.focus();
+                navigate(reportNotificationPath(latestReport.id));
+                notification.close();
+              };
             } catch (error) {
               console.error("Error displaying browser notification:", error);
             }
@@ -290,11 +317,31 @@ export default function AdminLayout() {
       if (timeout !== null) window.clearTimeout(timeout);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated || userRole !== "superadmin") return;
+    const handlePushMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "account_approval_requested") return;
+      const target = accountNotificationPath(
+        typeof event.data.accountId === "string" ? event.data.accountId : "",
+      );
+      toast((notification) => (
+        <button type="button" className="text-left" onClick={() => {
+          toast.dismiss(notification.id);
+          navigate(target);
+        }}>
+          Account approval needed. Review application
+        </button>
+      ), { duration: 10000 });
+    };
+    navigator.serviceWorker?.addEventListener("message", handlePushMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", handlePushMessage);
+  }, [isAuthenticated, userRole, navigate]);
 
   if (!isAuthReady) return null;
   if (!isAuthenticated) {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to="/admin" replace state={{ from: location.pathname + location.search }} />;
   }
 
 

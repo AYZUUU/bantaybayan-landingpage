@@ -9,7 +9,7 @@ import {
   LuUsers,
 } from "react-icons/lu";
 import { createPortal } from "react-dom";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   getManagedUsers,
@@ -57,6 +57,21 @@ function getAccountStatusClass(status: string) {
   }
 }
 
+function mapUser(user: ManagedUser): UserAccount {
+  return {
+    id: user.id,
+    name: `${user.first_name} ${user.last_name}`.trim() || "Unknown",
+    first_name: user.first_name,
+    last_name: user.last_name,
+    contact: user.email || user.contact_number || "N/A",
+    contact_number: user.contact_number,
+    role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
+    status: user.status.charAt(0).toUpperCase() + user.status.slice(1),
+    station: user.station ?? undefined,
+    photo_url: user.photo_url,
+  };
+}
+
 function StatCard({ icon, title, value, trend }: StatCardProps) {
   return (
     <div className="superadmin-stat-card flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -81,6 +96,8 @@ export default function Superadmin() {
 
   // Modal States
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const notificationAccountId = searchParams.get("account");
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
 
   // Add User / Responder Modal State
@@ -100,12 +117,13 @@ export default function Superadmin() {
   const [editContact, setEditContact] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editStatus, setEditStatus] = useState("Active");
+  const [editStation, setEditStation] = useState("");
 
   const { reports } = useOutletContext<{ reports: Report[] }>();
 
   const totalReports = reports ? reports.length : 0;
-  const pendingCitizens = citizens.filter(
-    (citizen) => citizen.status.toLowerCase() === "pending",
+  const pendingAccounts = [...citizens, ...responders].filter(
+    (user) => user.status.toLowerCase() === "pending",
   );
   const unresolvedReports = reports
     ? reports.filter(
@@ -117,20 +135,6 @@ export default function Superadmin() {
   ).length : 0;
 
   const populateDashboardData = useCallback((users: ManagedUser[]) => {
-    const mapUser = (user: ManagedUser): UserAccount => ({
-      id: user.id,
-      name: `${user.first_name} ${user.last_name}`.trim() || "Unknown",
-      first_name: user.first_name,
-      last_name: user.last_name,
-      contact: user.email || user.contact_number || "N/A",
-      contact_number: user.contact_number,
-      role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
-      status: user.status.charAt(0).toUpperCase() + user.status.slice(1),
-      station:
-        user.station ||
-        (user.role === "responder" ? "Metro Vigan Central" : undefined),
-      photo_url: user.photo_url,
-    });
     setAdmins(
       users
         .filter((user) => user.role === "admin" || user.role === "superadmin")
@@ -143,6 +147,39 @@ export default function Superadmin() {
       users.filter((user) => user.role === "responder").map(mapUser),
     );
   }, []);
+
+  useEffect(() => {
+    if (!notificationAccountId) return;
+    let active = true;
+    const openAccount = async () => {
+      try {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notificationAccountId)) {
+          throw new Error("Invalid account notification.");
+        }
+        const users = await getManagedUsers();
+        if (!active) return;
+        const user = users.find((item) => item.id === notificationAccountId);
+        if (!user || !["citizen", "responder"].includes(user.role)) {
+          throw new Error("This account is no longer available.");
+        }
+        populateDashboardData(users);
+        setSelectedUser(mapUser(user));
+      } catch (error) {
+        if (!active) return;
+        console.error("Could not open the account notification:", error);
+        toast.error(error instanceof Error ? error.message : "Could not open this account.");
+      }
+      if (active) {
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
+          next.delete("account");
+          return next;
+        }, { replace: true });
+      }
+    };
+    void openAccount();
+    return () => { active = false; };
+  }, [notificationAccountId, populateDashboardData, setSearchParams]);
 
   const fetchDashboardData = async () => {
     try {
@@ -161,19 +198,27 @@ export default function Superadmin() {
 
   useEffect(() => {
     let active = true;
-    void getManagedUsers()
-      .then((users) => {
-        if (active) populateDashboardData(users);
-      })
-      .catch((error: unknown) => {
-        console.error("Failed to fetch dashboard data:", error);
-        if (active) toast.error("Could not load user accounts.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    const loadUsers = () => {
+      void getManagedUsers()
+        .then((users) => {
+          if (active) populateDashboardData(users);
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to fetch dashboard data:", error);
+          if (active) toast.error("Could not load user accounts.");
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+    const handlePushMessage = (event: MessageEvent) => {
+      if (event.data?.type === "account_approval_requested") loadUsers();
+    };
+    loadUsers();
+    navigator.serviceWorker?.addEventListener("message", handlePushMessage);
     return () => {
       active = false;
+      navigator.serviceWorker?.removeEventListener("message", handlePushMessage);
     };
   }, [populateDashboardData]);
 
@@ -259,6 +304,7 @@ export default function Superadmin() {
     setEditLastName(user.last_name);
     setEditContact(user.contact_number);
     setEditRole(user.role);
+    setEditStation(user.station || "");
     const normalizedStatus = user.status
       ? user.status.charAt(0).toUpperCase() + user.status.slice(1).toLowerCase()
       : "Active";
@@ -280,6 +326,9 @@ export default function Superadmin() {
           contact_number: editContact,
           role: editRole.toLowerCase(),
           status: editStatus.toLowerCase(),
+          ...(editingUser.role.toLowerCase() === "responder"
+            ? { station: editStation.trim() }
+            : {}),
       });
       const refreshed = await fetchDashboardData();
       setEditingUser(null);
@@ -290,7 +339,7 @@ export default function Superadmin() {
     }
   };
 
-  const handleApproveCitizen = async (user: UserAccount) => {
+  const handleApproveAccount = async (user: UserAccount) => {
     if (approvingUserId) return;
     setApprovingUserId(user.id);
     try {
@@ -304,10 +353,15 @@ export default function Superadmin() {
           citizen.id === user.id ? { ...citizen, status: "Active" } : citizen,
         ),
       );
+      setResponders((current) =>
+        current.map((responder) =>
+          responder.id === user.id ? { ...responder, status: "Active" } : responder,
+        ),
+      );
       setSelectedUser(null);
       toast.success(`${user.name}’s account has been approved.`);
     } catch (error) {
-      console.error("Could not approve citizen account:", error);
+      console.error("Could not approve account:", error);
       toast.error(
         error instanceof Error ? error.message : "Could not approve this account.",
       );
@@ -389,12 +443,12 @@ export default function Superadmin() {
                 Account review queue
               </h2>
               <p className="mt-0.5 text-sm text-slate-600">
-                Review submitted ID documents before approving new citizens.
+                Review submitted ID documents before approving new accounts.
               </p>
             </div>
           </div>
           <span className="inline-flex w-fit items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-800">
-            {pendingCitizens.length} pending
+            {pendingAccounts.length} pending
           </span>
         </div>
 
@@ -402,16 +456,16 @@ export default function Superadmin() {
           <p className="px-6 py-5 text-sm text-slate-500" role="status">
             Loading account applications…
           </p>
-        ) : pendingCitizens.length === 0 ? (
+        ) : pendingAccounts.length === 0 ? (
           <div className="flex items-center gap-3 px-6 py-6 text-sm text-slate-600">
             <span className="rounded-full bg-emerald-100 p-2 text-emerald-700">
               <LuCheck size={18} aria-hidden="true" />
             </span>
-            All citizen applications have been reviewed.
+            All account applications have been reviewed.
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {pendingCitizens.map((citizen) => (
+            {pendingAccounts.map((citizen) => (
               <li
                 key={citizen.id}
                 className="superadmin-table-row flex flex-col gap-4 px-5 py-4 transition-colors hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between sm:px-6"
@@ -598,7 +652,7 @@ export default function Superadmin() {
                         {resp.contact}
                       </td>
                       <td className="py-3 px-4 text-gray-600 font-medium">
-                        {resp.station || "Metro Vigan Central"}
+                        {resp.station || "Not assigned"}
                       </td>
                       <td className="py-3 px-4">
                         <span
@@ -884,6 +938,25 @@ export default function Superadmin() {
                   className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:outline-blue-600"
                 />
               </div>
+              {editingUser.role.toLowerCase() === "responder" && (
+                <div>
+                  <label
+                    htmlFor="edit-responder-station"
+                    className="block text-xs font-semibold text-gray-600 mb-1"
+                  >
+                    Assigned Station
+                  </label>
+                  <input
+                    id="edit-responder-station"
+                    type="text"
+                    value={editStation}
+                    onChange={(e) => setEditStation(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:outline-blue-600"
+                    maxLength={120}
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Account Status / Approval Workflow
@@ -974,10 +1047,10 @@ export default function Superadmin() {
                     : "Unknown"}
                 </span>
               </div>
-              {selectedUser.station && (
+              {selectedUser.role.toLowerCase() === "responder" && (
                 <div className="col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Assigned Station</span>
-                  <span className="text-sm font-bold text-slate-800">{selectedUser.station}</span>
+                  <span className="text-sm font-bold text-slate-800">{selectedUser.station || "Not assigned"}</span>
                 </div>
               )}
             </div>
@@ -1012,7 +1085,7 @@ export default function Superadmin() {
                 <button
                   type="button"
                   disabled={approvingUserId !== null}
-                  onClick={() => void handleApproveCitizen(selectedUser)}
+                  onClick={() => void handleApproveAccount(selectedUser)}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
                 >
                   <LuCheck size={17} aria-hidden="true" />

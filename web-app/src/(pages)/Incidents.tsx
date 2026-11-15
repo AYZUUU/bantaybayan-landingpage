@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   LuShieldAlert,
@@ -17,17 +17,18 @@ import {
   LuListFilter,
 } from "react-icons/lu";
 import IncidentMap from "../components/IncidentMap";
-import { getActiveResponders, updateAdminReport } from "../utils/reports";
+import ReporterIdPhoto from "../components/ReporterIdPhoto";
+import { getActiveResponders, getAdminReports, updateAdminReport } from "../utils/reports";
 
 interface Report {
   id: number;
+  user_id: string | null;
   emergency_type: string;
   accident_level: string;
   reporter_name: string;
   contact_number?: string | null;
   description?: string | null;
   email?: string | null;
-  user_id_photo?: string | null;
   image_path: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -68,6 +69,8 @@ export default function Incidents() {
   }>();
 
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const notificationReportId = searchParams.get("report");
   const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false);
   const [dispatchReport, setDispatchReport] = useState<Report | null>(null);
   const [selectedResponderId, setSelectedResponderId] = useState("");
@@ -79,6 +82,41 @@ export default function Incidents() {
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("all");
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const filterLoadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!notificationReportId) return;
+    let active = true;
+    const clearTarget = () => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("report");
+        return next;
+      }, { replace: true });
+    };
+    const openReport = async () => {
+      try {
+        if (!/^[1-9]\d*$/.test(notificationReportId) || !Number.isSafeInteger(Number(notificationReportId))) {
+          throw new Error("Invalid report notification.");
+        }
+        const report = (await getAdminReports()).find((item) => item.id === Number(notificationReportId));
+        if (!active) return;
+        if (!report) throw new Error("This report is no longer available.");
+        setSelectedReport({
+          ...report,
+          emergency_type: report.emergency_type || "Incident",
+          accident_level: report.accident_level || "",
+          reporter_name: report.reporter_name || "Anonymous",
+        });
+      } catch (error) {
+        if (!active) return;
+        console.error("Could not open the report notification:", error);
+        toast.error(error instanceof Error ? error.message : "Could not open this report.");
+      }
+      if (active) clearTarget();
+    };
+    void openReport();
+    return () => { active = false; };
+  }, [notificationReportId, setSearchParams]);
 
   useEffect(() => {
     return () => {
@@ -588,23 +626,7 @@ export default function Incidents() {
                     </p>
                   </div>
 
-                  {selectedReport.user_id_photo ? (
-                    <div className="pt-2 border-t border-slate-200/60">
-                      <p className="text-[11px] font-bold text-blue-600 mb-1">
-                        Verified Government / Student ID:
-                      </p>
-                      <img
-                        src={selectedReport.user_id_photo}
-                        alt="Scanned ID"
-                        className="w-full h-24 sm:h-28 object-cover rounded-xl border border-slate-300 bg-white"
-                      />
-                    </div>
-                  ) : (
-                    <div className="p-2 bg-rose-50 text-rose-600 rounded-lg text-xs font-semibold flex items-center gap-1 border border-rose-200">
-                      <LuTriangleAlert size={14} />
-                      <span>No scanned ID on file for this account.</span>
-                    </div>
-                  )}
+                  <ReporterIdPhoto userId={selectedReport.user_id} />
                 </div>
 
                 {selectedReport.image_path && (

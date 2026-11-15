@@ -157,7 +157,8 @@ html[data-theme="dark"] .login-page .login-card input::placeholder {
   color: #064e3b;
 }
 
-.incident-map .incident-map-cluster span {
+.incident-map .incident-map-cluster button {
+  all: unset;
   display: grid;
   place-items: center;
   width: 30px;
@@ -170,11 +171,8 @@ html[data-theme="dark"] .login-page .login-card input::placeholder {
   font: inherit;
   font-weight: 700;
   line-height: 1;
+  cursor: pointer;
   transition: transform 160ms ease-out;
-}
-
-.incident-map .incident-map-cluster:hover span {
-  transform: scale(1.06);
 }
 
 .incident-map-expanded-cluster {
@@ -182,7 +180,8 @@ html[data-theme="dark"] .login-page .login-card input::placeholder {
   background: transparent;
 }
 
-.incident-map .incident-map-expanded-cluster span {
+.incident-map .incident-map-expanded-cluster button {
+  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,22 +198,17 @@ html[data-theme="dark"] .login-page .login-card input::placeholder {
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
+  cursor: pointer;
   transition:
     background-color 160ms ease-out,
     transform 160ms ease-out;
 }
 
-.incident-map .incident-map-expanded-cluster:hover span {
-  transform: scale(1.06);
-}
-
-.incident-map .incident-map-expanded-cluster span span {
-  width: auto;
-  height: auto;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 18px;
+@media (hover: hover) and (pointer: fine) {
+  .incident-map .incident-map-cluster:hover button,
+  .incident-map .incident-map-expanded-cluster:hover button {
+    transform: scale(1.06);
+  }
 }
 
 .incident-map .incident-map-marker-enter {
@@ -288,8 +282,8 @@ html[data-theme="dark"] .login-page .login-card input::placeholder {
   animation: incident-map-marker-content-exit 150ms ease-in forwards;
 }
 
-.incident-map .incident-map-cluster:focus-visible,
-.incident-map .incident-map-expanded-cluster:focus-visible {
+.incident-map .incident-map-cluster button:focus-visible,
+.incident-map .incident-map-expanded-cluster button:focus-visible {
   outline: 3px solid #facc15;
   outline-offset: 3px;
 }
@@ -350,8 +344,8 @@ html[data-theme="dark"] .login-page .login-card input::placeholder {
     animation: none;
   }
 
-  .incident-map .incident-map-cluster span,
-  .incident-map .incident-map-expanded-cluster span {
+  .incident-map .incident-map-cluster button,
+  .incident-map .incident-map-expanded-cluster button {
     transition: none;
   }
 }
