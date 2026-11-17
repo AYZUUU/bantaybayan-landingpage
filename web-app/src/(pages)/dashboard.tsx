@@ -476,7 +476,7 @@ export default function Dashboard() {
                           : "bg-emerald-100 text-emerald-800"
                     }`}
                   >
-                    {activeStatus}
+                    {activeStatus === "dispatched" ? "en route" : activeStatus}
                   </span>
                   <button
                     type="button"

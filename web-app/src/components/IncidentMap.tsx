@@ -70,6 +70,7 @@ function getMarkerStatus(status?: string) {
 
 function getDisplayStatus(status?: string) {
   const markerStatus = getMarkerStatus(status);
+  if (markerStatus === "dispatched") return "En route";
   return markerStatus.charAt(0).toUpperCase() + markerStatus.slice(1);
 }
 

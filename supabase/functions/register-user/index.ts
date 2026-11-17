@@ -3,8 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+    "authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "Access-Control-Allow-Headers",
 };
 
 function respond(status: number, body: Record<string, unknown>) {
@@ -126,6 +127,28 @@ Deno.serve(async (request: Request) => {
       .maybeSingle();
     if (profileError || !profile) {
       throw profileError || new Error("The new account profile was not created.");
+    }
+
+    try {
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+      if (!anonKey) throw new Error("Missing Supabase publishable key.");
+      const notificationResponse = await fetch(
+        `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/notify-report-event`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: anonKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ event: "account_approval_requested", userId }),
+        },
+      );
+      if (!notificationResponse.ok) {
+        console.error("Could not notify superadmins of account approval:", notificationResponse.status);
+      }
+    } catch (error) {
+      console.error("Could not notify superadmins of account approval:", error);
     }
 
     return respond(200, {

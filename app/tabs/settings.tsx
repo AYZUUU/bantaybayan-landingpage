@@ -80,7 +80,12 @@ export default function Settings() {
 
   const handleLogout = async () => {
     setIsLogoutConfirmationVisible(false);
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Could not log out", text2: error instanceof Error ? error.message : "Try again." });
+      return;
+    }
     router.replace("/");
     Toast.show({
       type: "success",
@@ -669,7 +674,7 @@ export default function Settings() {
             value={newEmail}
             onChangeText={setNewEmail}
             placeholder="New email address"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={isDark ? "#94a3b8" : "#475569"}
             style={[
               styles.emailInput,
               isDark && styles.darkEmailInput,
@@ -715,7 +720,7 @@ export default function Settings() {
             value={newPhone}
             onChangeText={setNewPhone}
             placeholder="Phone number"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={isDark ? "#94a3b8" : "#475569"}
             style={[styles.emailInput, isDark && styles.darkEmailInput]}
           />
           <Pressable
@@ -783,7 +788,7 @@ export default function Settings() {
                 keyboardType="number-pad"
                 maxLength={6}
                 placeholder="6-digit code"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={isDark ? "#94a3b8" : "#475569"}
                 style={[styles.emailInput, isDark && styles.darkEmailInput]}
               />
               <Pressable

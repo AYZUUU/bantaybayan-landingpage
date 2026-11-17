@@ -41,7 +41,7 @@ export default function StatusOverviewCards({ reports }: StatusOverviewProps) {
           <LuTruck size={23} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-500">Dispatched</p>
+          <p className="text-sm font-semibold text-slate-500">En Route</p>
           <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{dispatchedCount}</p>
         </div>
       </div>

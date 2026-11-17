@@ -66,7 +66,7 @@ export default function AdminResponderLocation({
     <section className="space-y-2 border-t border-slate-100 pt-4">
       <h4 className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700">
         <LuMapPin size={15} className="text-blue-600" />
-        Dispatched Rescuer Live Location
+        En Route Rescuer Live Location
       </h4>
       {location ? (
         <>

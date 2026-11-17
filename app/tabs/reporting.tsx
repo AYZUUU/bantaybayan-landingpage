@@ -667,10 +667,10 @@ export default function Reporting() {
             >
               {activeReportStatus.status.toLowerCase().includes("resolved")
                 ? "Report Resolved"
-                : activeReportStatus.status.toLowerCase() === "dispatched"
+                : activeReportStatus.status.toLowerCase().includes("en route")
                   ? activeReportStatus.responderName
-                    ? `${activeReportStatus.responderName} is on the way to your location`
-                    : "Rescuer Dispatched to Your Location"
+                    ? `${activeReportStatus.responderName} is en route to your location`
+                    : "Rescuer En Route to Your Location"
                   : activeReportStatus.status}
             </Text>
 

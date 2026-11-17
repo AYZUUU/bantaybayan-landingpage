@@ -29,7 +29,7 @@ begin
   perform 1 from public.reports
     where assigned_responder_id = (select auth.uid())
       and user_id is not null
-      and lower(trim(status)) = 'dispatched'
+      and lower(trim(status)) = 'en route'
     for share;
   if not found then
     return false;
@@ -38,7 +38,7 @@ begin
   select id, (select auth.uid()) from public.reports
   where assigned_responder_id = (select auth.uid())
     and user_id is not null
-    and lower(trim(status)) = 'dispatched'
+    and lower(trim(status)) = 'en route'
   on conflict do nothing;
   return true;
 end;
@@ -69,7 +69,7 @@ begin
   where s.responder_id = (select auth.uid())
     and r.assigned_responder_id = (select auth.uid())
     and r.user_id is not null
-    and lower(trim(r.status)) = 'dispatched'
+    and lower(trim(r.status)) = 'en route'
   for share of r;
   if not found then
     return 0;
@@ -88,7 +88,7 @@ begin
     where s.responder_id = (select auth.uid())
       and r.assigned_responder_id = (select auth.uid())
       and r.user_id is not null
-      and lower(trim(r.status)) = 'dispatched'
+      and lower(trim(r.status)) = 'en route'
   )
   insert into public.responder_live_locations
     (report_id, responder_id, latitude, longitude, updated_at)
@@ -122,7 +122,7 @@ as $$
       where p.id = l.responder_id and p.role = 'responder' and p.status = 'active'
     )
     and r.assigned_responder_id = l.responder_id
-    and lower(trim(r.status)) = 'dispatched'
+    and lower(trim(r.status)) = 'en route'
     and l.updated_at > now() - interval '2 minutes';
 $$;
 
@@ -148,7 +148,7 @@ set search_path = ''
 as $$
 begin
   if new.assigned_responder_id is distinct from old.assigned_responder_id
-    or lower(trim(new.status)) <> 'dispatched' then
+    or lower(trim(new.status)) <> 'en route' then
     delete from public.responder_location_sharing where report_id = new.id;
     delete from public.responder_live_locations where report_id = new.id;
   end if;

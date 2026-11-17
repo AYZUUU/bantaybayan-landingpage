@@ -270,7 +270,7 @@ export default function Signup() {
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => setIsScannerOpen(true)} style={styles.actionButton}>
-                    <Ionicons color="#EF4444" name="scan-outline" size={18} />
+                    <Ionicons color="#b91c1c" name="scan-outline" size={18} />
                     <Text style={styles.rescanText}>Rescan ID</Text>
                   </TouchableOpacity>
                 </View>
@@ -279,21 +279,21 @@ export default function Signup() {
               {/* Input Fields */}
               <TextInput
                 placeholder="First Name"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#475569"
                 style={styles.textInput}
                 value={firstName}
                 onChangeText={setFirstName}
               />
               <TextInput
                 placeholder="Last Name"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#475569"
                 style={styles.textInput}
                 value={lastName}
                 onChangeText={setLastName}
               />
               <TextInput
                 placeholder="Contact Number (e.g. 09123456789)"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#475569"
                 style={styles.textInput}
                 value={contactNumber}
                 onChangeText={setContactNumber}
@@ -301,7 +301,7 @@ export default function Signup() {
               />
               <TextInput
                 placeholder="Email"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#475569"
                 style={styles.textInput}
                 value={email}
                 onChangeText={setEmail}
@@ -310,7 +310,7 @@ export default function Signup() {
               />
               <TextInput
                 placeholder="Password"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#475569"
                 style={styles.textInput}
                 value={password}
                 onChangeText={setPassword}
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   rescanText: {
-    color: "#EF4444",
+    color: "#b91c1c",
     fontWeight: "600",
     fontSize: 15,
   },

@@ -238,7 +238,7 @@ export default function LoginScreen() {
                   onChangeText={setEmail}
                   autoCapitalize="none"
                   placeholder="Enter email"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor="#475569"
                 />
 
                 <Text style={[styles.label, { marginTop: 16 }]}>Password:</Text>
@@ -248,7 +248,7 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   secureTextEntry
                   placeholder="Enter password"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor="#475569"
                 />
               </View>
 
@@ -279,7 +279,7 @@ export default function LoginScreen() {
                     maxLength={6}
                     autoComplete="one-time-code"
                     placeholder="6-digit code"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor="#475569"
                   />
                   <Pressable
                     onPress={handleVerifyTotp}
@@ -303,7 +303,7 @@ export default function LoginScreen() {
                 <Text style={{ color: "#2A4C7C" }}>
                   Don&apos;t have an Account?{" "}
                 </Text>
-                <Text style={{ color: "#FF0000", fontWeight: "bold" }}>
+                <Text style={{ color: "#b91c1c", fontWeight: "bold" }}>
                   Sign Up
                 </Text>
               </Link>

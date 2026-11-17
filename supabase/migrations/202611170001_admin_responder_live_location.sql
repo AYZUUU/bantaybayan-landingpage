@@ -21,14 +21,14 @@ as $$
       where p.id = l.responder_id and p.role = 'responder' and p.status = 'active'
     )
     and r.assigned_responder_id = l.responder_id
-    and lower(trim(r.status)) = 'dispatched'
+    and lower(trim(r.status)) = 'en route'
     and l.updated_at > now() - interval '2 minutes';
 $$;
 
--- "Dispatched" is the single status for an assigned responder.
+-- "En Route" is the single status for an assigned responder.
 update public.reports
-set status = 'Dispatched'
-where lower(trim(status)) in ('rescuer en route', 'en route');
+set status = 'En Route'
+where lower(trim(status)) in ('rescuer en route', 'dispatched');
 
 create or replace function public.respond_to_report(report_id bigint)
 returns boolean
@@ -43,13 +43,13 @@ begin
 
   update public.reports
   set assigned_responder_id = (select auth.uid()),
-      status = 'Dispatched'
+      status = 'En Route'
   where id = report_id
     and (
       assigned_responder_id is null
       or assigned_responder_id = (select auth.uid())
     )
-    and lower(status) in ('pending', 'dispatched', 'assigned');
+    and lower(status) in ('pending', 'dispatched', 'assigned', 'en route');
 
   return found;
 end;

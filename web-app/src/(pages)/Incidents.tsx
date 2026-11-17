@@ -315,7 +315,7 @@ export default function Incidents() {
     },
     {
       id: "dispatched",
-      label: "Dispatched",
+      label: "En Route",
       icon: LuTruck,
       activeClass: "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20",
       countClass: "bg-white/20 text-white",
@@ -544,7 +544,9 @@ export default function Incidents() {
                       ) : (
                         <LuCircleCheck size={13} />
                       )}
-                      <span className="capitalize">{currentStatus}</span>
+                      <span className="capitalize">
+                        {currentStatus === "dispatched" ? "en route" : currentStatus}
+                      </span>
                     </span>
 
                     <button
@@ -719,7 +721,9 @@ export default function Incidents() {
                         : "bg-emerald-100 text-emerald-800"
                   }`}
                 >
-                  {getDisplayStatus(selectedReport.status)}
+                  {getDisplayStatus(selectedReport.status) === "dispatched"
+                    ? "en route"
+                    : getDisplayStatus(selectedReport.status)}
                 </span>
                 <div className="grid grid-cols-2 gap-2 sm:w-auto">
                   <button

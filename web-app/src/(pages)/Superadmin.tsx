@@ -551,7 +551,7 @@ export default function Superadmin() {
                     : check.status}
                 </span>
               </div>
-              <p className="mt-2 break-words text-sm text-slate-500">
+              <p className="mt-2 wrap-break-word text-sm text-slate-500">
                 {check.details}
               </p>
             </div>
@@ -757,7 +757,7 @@ export default function Superadmin() {
       {/* --- ADD NEW ADMIN / RESPONDER MODAL --- */}
       {isAddUserOpen && (
         createPortal(
-        <div className="web-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-4">
+        <div className="web-modal-backdrop fixed inset-0 z-100 flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-4">
           <div className="web-modal-panel superadmin-modal-panel relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
             <button
               onClick={() => setIsAddUserOpen(false)}
@@ -891,7 +891,7 @@ export default function Superadmin() {
       {/* --- UNIVERSAL EDIT MODAL WITH APPROVE/SUSPEND STATUS CONTROLS --- */}
       {editingUser && (
         createPortal(
-        <div className="web-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-4">
+        <div className="web-modal-backdrop fixed inset-0 z-100 flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-4">
           <div className="web-modal-panel superadmin-modal-panel relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
             <button
               onClick={() => setEditingUser(null)}
@@ -997,7 +997,7 @@ export default function Superadmin() {
         createPortal(
         <div
           onClick={() => setSelectedUser(null)}
-          className="web-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-3 backdrop-blur-xs sm:p-4"
+          className="web-modal-backdrop fixed inset-0 z-100 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-3 backdrop-blur-xs sm:p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}

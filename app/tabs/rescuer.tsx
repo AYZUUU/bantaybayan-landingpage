@@ -94,8 +94,8 @@ export default function Rescuer() {
           return (
             !isInitialFetch &&
             report.assigned_responder_id === userId &&
-            currentStatus.includes("dispatched") &&
-            !previousStatus.includes("dispatched")
+            currentStatus.includes("en route") &&
+            !previousStatus.includes("en route")
           );
         });
 
@@ -305,10 +305,10 @@ export default function Rescuer() {
 
       const respondedReport = {
         ...newReportData,
-        status: "Dispatched",
+        status: "En Route",
         assigned_responder_id: userId,
       };
-      previousStatusesRef.current.set(Number(respondedReport.id), "dispatched");
+      previousStatusesRef.current.set(Number(respondedReport.id), "en route");
       setNewReportData(respondedReport);
       setReports((currentReports) =>
         currentReports.map((report) =>

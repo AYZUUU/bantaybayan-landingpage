@@ -153,7 +153,7 @@ export async function updateAdminReport(
   const { data, error } = await supabase
     .from("reports")
     .update({
-      status,
+      status: status.toLowerCase() === "dispatched" ? "En Route" : status,
       ...(responderId ? { assigned_responder_id: responderId } : {}),
     })
     .eq("id", reportId)

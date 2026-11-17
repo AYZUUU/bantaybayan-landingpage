@@ -1,11 +1,12 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webPush from "npm:web-push@3.6.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+    "authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "Access-Control-Allow-Headers",
 };
 
 type ReportEvent =
@@ -20,6 +21,59 @@ function respond(status: number, body: Record<string, unknown>) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function sendWebNotifications(
+  adminClient: SupabaseClient,
+  targetIds: string[],
+  payload: { title: string; body: string; tag: string; url: string; event: string },
+) {
+  const { data: subscriptions, error: subscriptionError } = await adminClient
+    .from("web_push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .in("user_id", targetIds);
+  if (subscriptionError) throw subscriptionError;
+  if (!subscriptions?.length) return 0;
+
+  const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
+  const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
+  const vapidSubject = Deno.env.get("VAPID_SUBJECT");
+  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
+    console.error("Web push VAPID secrets are not configured.");
+    return 0;
+  }
+
+  webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  const results = await Promise.all(
+    subscriptions.map(async (subscription) => {
+      try {
+        await webPush.sendNotification(
+          {
+            endpoint: subscription.endpoint,
+            keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+          },
+          JSON.stringify(payload),
+        );
+        return true;
+      } catch (error) {
+        const statusCode =
+          typeof error === "object" && error !== null && "statusCode" in error
+            ? error.statusCode
+            : null;
+        if (statusCode === 404 || statusCode === 410) {
+          const { error: deleteError } = await adminClient
+            .from("web_push_subscriptions")
+            .delete()
+            .eq("id", subscription.id);
+          if (deleteError) console.error("Could not remove expired push subscription.");
+          return false;
+        }
+        console.error("Web push delivery failed:", error);
+        return false;
+      }
+    }),
+  );
+  return results.filter(Boolean).length;
 }
 
 Deno.serve(async (request: Request) => {
@@ -76,6 +130,54 @@ Deno.serve(async (request: Request) => {
     }
 
     const body: unknown = await request.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "event" in body &&
+      body.event === "account_approval_requested"
+    ) {
+      if (!internalRequest) {
+        return respond(403, { error: "Only the registration service can send approval alerts." });
+      }
+      if (
+        !("userId" in body) ||
+        typeof body.userId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.userId)
+      ) {
+        return respond(400, { error: "Invalid account notification request." });
+      }
+      const { data: applicant, error: applicantError } = await adminClient
+        .from("profiles")
+        .select("id, role, status")
+        .eq("id", body.userId)
+        .maybeSingle();
+      if (applicantError) throw applicantError;
+      if (
+        !applicant ||
+        applicant.status !== "pending" ||
+        !["citizen", "responder"].includes(applicant.role)
+      ) {
+        return respond(404, { error: "Pending account not found." });
+      }
+      const { data: superadmins, error: superadminError } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("role", "superadmin")
+        .eq("status", "active");
+      if (superadminError) throw superadminError;
+      const targetIds = (superadmins || []).map((profile) => profile.id);
+      if (!targetIds.length) return respond(200, { sent: 0 });
+
+      const sent = await sendWebNotifications(adminClient, targetIds, {
+        title: "Account approval needed",
+        body: "A new account is waiting for review.",
+        tag: `account-approval-${applicant.id}`,
+        url: "/superadmin",
+        event: "account_approval_requested",
+      });
+      return respond(200, { sent });
+    }
+
     if (
       typeof body !== "object" ||
       body === null ||
@@ -236,59 +338,13 @@ Deno.serve(async (request: Request) => {
       }),
     );
 
-    const { data: subscriptions, error: subscriptionError } = await adminClient
-      .from("web_push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
-      .in("user_id", targetIds);
-    if (subscriptionError) throw subscriptionError;
-
-    let webPushCount = 0;
-    const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
-    const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
-    const vapidSubject = Deno.env.get("VAPID_SUBJECT");
-    if (subscriptions?.length && vapidPublicKey && vapidPrivateKey && vapidSubject) {
-      webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-      const results = await Promise.all(
-        subscriptions.map(async (subscription) => {
-          try {
-            await webPush.sendNotification(
-              {
-                endpoint: subscription.endpoint,
-                keys: {
-                  p256dh: subscription.p256dh,
-                  auth: subscription.auth,
-                },
-              },
-              JSON.stringify({
-                title,
-                body: message,
-                tag,
-                url: appUrl,
-              }),
-            );
-            return true;
-          } catch (error) {
-            const statusCode =
-              typeof error === "object" && error !== null && "statusCode" in error
-                ? error.statusCode
-                : null;
-            if (statusCode === 404 || statusCode === 410) {
-              const { error: deleteError } = await adminClient
-                .from("web_push_subscriptions")
-                .delete()
-                .eq("id", subscription.id);
-              if (deleteError) console.error("Could not remove expired push subscription.");
-              return false;
-            }
-            console.error("Web push delivery failed:", error);
-            return false;
-          }
-        }),
-      );
-      webPushCount = results.filter(Boolean).length;
-    } else if (subscriptions?.length) {
-      console.error("Web push VAPID secrets are not configured.");
-    }
+    const webPushCount = await sendWebNotifications(adminClient, targetIds, {
+      title,
+      body: message,
+      tag,
+      url: appUrl,
+      event,
+    });
 
     return respond(200, {
       sent: expoResponses.filter(Boolean).length + webPushCount,

@@ -259,7 +259,7 @@ export default function Preview() {
                   />
                 </View>
               ) : (
-                <Text style={{ color: "#EF4444", fontStyle: "italic" }}>
+                <Text style={{ color: "#b91c1c", fontStyle: "italic" }}>
                   {hasPhotoLoadError
                     ? "The captured ID image could not be displayed. Go back and scan it again."
                     : "No ID photo provided."}
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   previewImage: { width: "100%", height: "100%" },
   confirmButton: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#15803d",
     borderRadius: 12,
     height: 48,
     justifyContent: "center",
