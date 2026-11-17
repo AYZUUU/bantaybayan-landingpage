@@ -17,6 +17,7 @@
   import { useAuth } from "../../shared/auth";
   import LogoutConfirmation from "../../shared/LogoutConfirmation";
   import { getCitizenReports } from "../../services/reports";
+  import RescuerLocation from "../../shared/RescuerLocation";
   import { useActivePolling } from "../../shared/useActivePolling";
   import { lookupPlaceName } from "../../shared/placeName";
 
@@ -194,7 +195,12 @@
 
     const handleLogout = async () => {
       setIsLogoutConfirmationVisible(false);
-      await signOut();
+      try {
+        await signOut();
+      } catch (error) {
+        Toast.show({ type: "error", text1: "Could not log out", text2: error instanceof Error ? error.message : "Try again." });
+        return;
+      }
       router.replace("/");
       Toast.show({
         type: "success",
@@ -395,7 +401,7 @@
                           </Text>
 
                           {report.accident_level && (
-                            <Text style={styles.severityLevel}>
+                            <Text style={[styles.severityLevel, isDark && darkStyles.severityLevel]}>
                               Severity: {report.accident_level}
                             </Text>
                           )}
@@ -654,6 +660,20 @@
                         </Text>
                       </View>
                     </View>
+                  </View>
+
+                  <View style={[styles.modalInfoGroup, isDark && darkStyles.modalInfoGroup]}>
+                    <Text style={[styles.modalLabel, isDark && darkStyles.darkSecondaryText]}>
+                      Rescuer location
+                    </Text>
+                    {isModalVisible && (
+                      <RescuerLocation
+                        key={selectedReport.id}
+                        reportId={selectedReport.id}
+                        enabled={isLoggedIn && isFocused}
+                        isDark={isDark}
+                      />
+                    )}
                   </View>
 
                   <View
@@ -1054,11 +1074,11 @@
     severityLevel: {
       fontSize: 12,
       fontWeight: "600",
-      color: "#ea580c",
+      color: "#9a3412",
       textTransform: "uppercase",
       marginBottom: 4,
     },
-    dateText: { fontSize: 12, color: "#94a3b8" },
+    dateText: { fontSize: 12, color: "#64748b" },
     badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999 },
     badgeText: { fontSize: 12, fontWeight: "bold" },
     cardImage: {
@@ -1152,7 +1172,7 @@
     },
     modalNoImageText: {
       marginTop: 8,
-      color: "#94a3b8",
+      color: "#64748b",
       fontWeight: "500",
     },
     modalInfoGroup: {
@@ -1191,6 +1211,7 @@
   const darkStyles = StyleSheet.create({
     darkText: { color: "#f8fafc" },
     darkSecondaryText: { color: "#cbd5e1" },
+    severityLevel: { color: "#ea580c" },
     darkCard: { backgroundColor: "#1e293b", borderColor: "#334155" },
     filterModalOverlay: { backgroundColor: "rgba(2, 6, 23, 0.72)" },
     darkIconWrapper: { backgroundColor: "#1e3a5f" },

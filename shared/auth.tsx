@@ -271,6 +271,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    const { stopResponderLocation } = await import("../services/responderLocation");
+    try {
+      await stopResponderLocation();
+    } catch (error) {
+      console.error("Could not fully stop location sharing during sign out:", error);
+      throw new Error("Could not stop location sharing. Check your connection and try signing out again.");
+    }
     if (userId) {
       const { error: pushTokenError } = await supabase
         .from("profiles")

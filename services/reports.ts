@@ -170,6 +170,29 @@ export async function getCitizenReports(userId: string) {
   return Promise.all((data as ReportRecord[]).map(addSignedImageUrl));
 }
 
+export async function getResponderLiveLocation(reportId: number) {
+  const { data, error } = await supabase.rpc("get_responder_live_location", {
+    p_report_id: reportId,
+  });
+  if (error) throw new Error(`Could not load rescuer location: ${error.message}`);
+  if (!Array.isArray(data)) throw new Error("The server returned an invalid rescuer location.");
+  if (data.length === 0) return null;
+  const location: unknown = data[0];
+  if (
+    typeof location !== "object" || location === null ||
+    !("latitude" in location) || typeof location.latitude !== "number" ||
+    !("longitude" in location) || typeof location.longitude !== "number" ||
+    !("updated_at" in location) || typeof location.updated_at !== "string"
+  ) {
+    throw new Error("The server returned an invalid rescuer location.");
+  }
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    updatedAt: location.updated_at,
+  };
+}
+
 export async function getResponderReports() {
   const baseColumns =
     "id, reporter_name, contact_number, emergency_type, accident_level, status, latitude, longitude, municipality, province, description, image_path, created_at, assigned_responder_id";

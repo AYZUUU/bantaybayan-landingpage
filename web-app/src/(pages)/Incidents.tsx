@@ -17,6 +17,7 @@ import {
   LuListFilter,
 } from "react-icons/lu";
 import IncidentMap from "../components/IncidentMap";
+import AdminResponderLocation from "../components/AdminResponderLocation";
 import ReporterIdPhoto from "../components/ReporterIdPhoto";
 import { getActiveResponders, getAdminReports, updateAdminReport } from "../utils/reports";
 
@@ -46,20 +47,24 @@ interface Responder {
   contact_number: string;
 }
 
-type FilterStatus = "all" | "pending" | "dispatched" | "en route" | "resolved";
+type FilterStatus = "all" | "pending" | "dispatched" | "resolved";
 const INCIDENT_STATUS_TOAST_ID = "incident-status-update";
 
+// Older reports may still be stored as "En Route"; treat them as dispatched.
 function getDisplayStatus(status?: string | null): Exclude<FilterStatus, "all"> {
   const normalizedStatus = status?.trim().toLowerCase() || "";
   if (normalizedStatus.includes("resolved")) return "resolved";
-  if (normalizedStatus.includes("en route")) return "en route";
-  if (normalizedStatus.includes("dispatched")) return "dispatched";
+  if (
+    normalizedStatus.includes("dispatched") ||
+    normalizedStatus.includes("en route")
+  ) {
+    return "dispatched";
+  }
   return "pending";
 }
 
 function getFilterStatus(status?: string | null): Exclude<FilterStatus, "all"> {
-  const displayStatus = getDisplayStatus(status);
-  return displayStatus === "en route" ? "dispatched" : displayStatus;
+  return getDisplayStatus(status);
 }
 
 export default function Incidents() {
@@ -527,16 +532,14 @@ export default function Incidents() {
                       className={`py-2.5 px-1 sm:px-2 rounded-xl sm:rounded-2xl font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1 ${
                         currentStatus === "pending"
                           ? "bg-amber-50 text-amber-700 border border-amber-200/60"
-                          : currentStatus === "dispatched" ||
-                              currentStatus === "en route"
+                          : currentStatus === "dispatched"
                             ? "bg-blue-50 text-blue-700 border border-blue-200/60"
                             : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                       }`}
                     >
                       {currentStatus === "pending" ? (
                         <LuClock size={13} />
-                      ) : currentStatus === "dispatched" ||
-                        currentStatus === "en route" ? (
+                      ) : currentStatus === "dispatched" ? (
                         <LuTruck size={13} />
                       ) : (
                         <LuCircleCheck size={13} />
@@ -548,8 +551,7 @@ export default function Incidents() {
                       type="button"
                       onClick={() => openDispatchModal(report)}
                       className={`py-2.5 px-1 sm:px-2 rounded-xl sm:rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                        currentStatus === "dispatched" ||
-                          currentStatus === "en route"
+                        currentStatus === "dispatched"
                           ? "bg-blue-600 text-white shadow-xs"
                           : "bg-blue-50 text-blue-700 hover:bg-blue-100/80 border border-blue-200/60"
                       }`}
@@ -698,6 +700,13 @@ export default function Incidents() {
                 </div>
               </div>
 
+              {selectedReport.assigned_responder_id &&
+                getDisplayStatus(selectedReport.status) === "dispatched" && (
+                  <AdminResponderLocation
+                    reportId={selectedReport.id}
+                  />
+                )}
+
               <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span
                   role="status"
@@ -705,15 +714,12 @@ export default function Incidents() {
                   className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
                     getDisplayStatus(selectedReport.status) === "pending"
                       ? "bg-amber-100 text-amber-800"
-                      : getDisplayStatus(selectedReport.status) === "dispatched" ||
-                          getDisplayStatus(selectedReport.status) === "en route"
+                      : getDisplayStatus(selectedReport.status) === "dispatched"
                         ? "bg-blue-100 text-blue-800"
                         : "bg-emerald-100 text-emerald-800"
                   }`}
                 >
-                  {getDisplayStatus(selectedReport.status) === "en route"
-                    ? "En Route"
-                    : getDisplayStatus(selectedReport.status)}
+                  {getDisplayStatus(selectedReport.status)}
                 </span>
                 <div className="grid grid-cols-2 gap-2 sm:w-auto">
                   <button

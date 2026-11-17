@@ -30,14 +30,19 @@ interface Responder {
   contact_number: string;
 }
 
-type ReportStatus = "pending" | "dispatched" | "en route" | "resolved";
+type ReportStatus = "pending" | "dispatched" | "resolved";
 const INCIDENT_STATUS_TOAST_ID = "incident-status-update";
 
+// Older reports may still be stored as "En Route"; treat them as dispatched.
 function getDisplayStatus(status?: string | null): ReportStatus {
   const normalizedStatus = status?.trim().toLowerCase() || "";
   if (normalizedStatus.includes("resolved")) return "resolved";
-  if (normalizedStatus.includes("en route")) return "en route";
-  if (normalizedStatus.includes("dispatched")) return "dispatched";
+  if (
+    normalizedStatus.includes("dispatched") ||
+    normalizedStatus.includes("en route")
+  ) {
+    return "dispatched";
+  }
   return "pending";
 }
 
@@ -383,7 +388,7 @@ export default function Dashboard() {
                 >
                   <path d="M2 3h12l3 4h3a2 2 0 0 1 2 2v4h-2a3 3 0 0 1-6 0H9a3 3 0 0 1-6 0H1V5a2 2 0 0 1 1-2Zm1 2v4h12l-2-3H3Zm1 8a1 1 0 1 0 2 0 1 1 0 0 0-2 0Zm12 0a1 1 0 1 0 2 0 1 1 0 0 0-2 0Z" />
                 </svg>
-                Dispatched / en route
+                Dispatched
               </span>
             </div>
             <label
@@ -466,13 +471,12 @@ export default function Dashboard() {
                     className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
                       activeStatus === "pending"
                         ? "bg-amber-100 text-amber-800"
-                        : activeStatus === "dispatched" ||
-                            activeStatus === "en route"
+                        : activeStatus === "dispatched"
                           ? "bg-blue-100 text-blue-800"
                           : "bg-emerald-100 text-emerald-800"
                     }`}
                   >
-                    {activeStatus === "en route" ? "En Route" : activeStatus}
+                    {activeStatus}
                   </span>
                   <button
                     type="button"
@@ -572,9 +576,7 @@ export default function Dashboard() {
                           : void dispatchReport(activeReport, status)
                       }
                       className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        (activeStatus === status ||
-                          (status === "dispatched" &&
-                            activeStatus === "en route"))
+                        activeStatus === status
                           ? status === "dispatched"
                             ? "border-blue-600 bg-blue-600 text-white"
                             : "border-emerald-600 bg-emerald-600 text-white"

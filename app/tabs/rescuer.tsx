@@ -7,9 +7,9 @@ import * as Notifications from "expo-notifications";
 import { useIsFocused, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +17,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import { MapView, Marker } from "../../shared/MapComponents";
+import LocationMap from "../../shared/LocationMap";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
@@ -25,10 +25,10 @@ import Toast from "react-native-toast-message";
 import { useAuth } from "../../shared/auth";
 import RescuerCard, { Report } from "../../shared/rescuercard";
 import LogoutConfirmation from "../../shared/LogoutConfirmation";
-import OSMTileLayer, { OSM_ATTRIBUTION } from "../../shared/OSMTileLayer";
 import { useAppPreferences } from "../../shared/AppPreferences";
 import { useActivePolling } from "../../shared/useActivePolling";
 import { getResponderReports, requestReportBackup, respondToReport } from "../../services/reports";
+import { isResponderLocationRunning, startResponderLocation, stopResponderLocation } from "../../services/responderLocation";
 
 export default function Rescuer() {
   const router = useRouter();
@@ -39,6 +39,8 @@ export default function Rescuer() {
 
   const [reports, setReports] = useState<Report[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [sharingLocation, setSharingLocation] = useState(false);
+  const [locationBusy, setLocationBusy] = useState(false);
   const lastReportIdRef = useRef<number | null>(null);
   const isInitialFetchRef = useRef(true);
   const previousStatusesRef = useRef<Map<number, string>>(new Map());
@@ -91,6 +93,7 @@ export default function Rescuer() {
 
           return (
             !isInitialFetch &&
+            report.assigned_responder_id === userId &&
             currentStatus.includes("dispatched") &&
             !previousStatus.includes("dispatched")
           );
@@ -138,9 +141,65 @@ export default function Rescuer() {
       console.error("Fetch Error:", error);
       setLoadFailed(true);
     }
-  }, [preferences.notificationsEnabled]);
+  }, [preferences.notificationsEnabled, userId]);
 
   useActivePolling(isLoggedIn && isFocused, fetchReports);
+  const refreshLocationSharing = useCallback(async () => {
+    try {
+      setSharingLocation(await isResponderLocationRunning());
+    } catch (error) {
+      console.error("Could not check location sharing:", error);
+    }
+  }, []);
+  useActivePolling(isLoggedIn && isFocused, refreshLocationSharing, 10000);
+
+  const enableLocationSharing = async () => {
+    setLocationBusy(true);
+    try {
+      await startResponderLocation();
+      setSharingLocation(true);
+      Toast.show({ type: "success", text1: "Location sharing enabled" });
+    } catch (error) {
+      console.error("Could not enable location sharing:", error);
+      Toast.show({
+        type: "error",
+        text1: "Location sharing unavailable",
+        text2: error instanceof Error ? error.message : "Try again.",
+      });
+    } finally {
+      setLocationBusy(false);
+    }
+  };
+
+  const disableLocationSharing = async () => {
+    setLocationBusy(true);
+    try {
+      await stopResponderLocation(true);
+      setSharingLocation(false);
+      Toast.show({ type: "info", text1: "Location sharing stopped" });
+    } catch (error) {
+      console.error("Could not stop location sharing:", error);
+      await refreshLocationSharing();
+      Toast.show({
+        type: "error",
+        text1: "Could not fully stop location sharing",
+        text2: error instanceof Error ? error.message : "Try again.",
+      });
+    } finally {
+      setLocationBusy(false);
+    }
+  };
+
+  const confirmLocationSharing = () => {
+    Alert.alert(
+      "Share your location?",
+      "Citizens who submitted your current active responses can see your location, including while the app is in the background. New responses require confirmation. You can stop sharing at any time.",
+      [
+        { text: "Not now", style: "cancel" },
+        { text: "Enable sharing", onPress: () => void enableLocationSharing() },
+      ],
+    );
+  };
 
   useEffect(() => {
     if (!isLoggedIn || !isFocused) return;
@@ -165,7 +224,12 @@ export default function Rescuer() {
 
   const handleLogout = async () => {
     setIsLogoutConfirmationVisible(false);
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Could not log out", text2: error instanceof Error ? error.message : "Try again." });
+      return;
+    }
     router.replace("/");
     Toast.show({
       type: "success",
@@ -241,9 +305,10 @@ export default function Rescuer() {
 
       const respondedReport = {
         ...newReportData,
-        status: "Rescuer En Route",
+        status: "Dispatched",
         assigned_responder_id: userId,
       };
+      previousStatusesRef.current.set(Number(respondedReport.id), "dispatched");
       setNewReportData(respondedReport);
       setReports((currentReports) =>
         currentReports.map((report) =>
@@ -251,6 +316,7 @@ export default function Rescuer() {
         ),
       );
       setDetailsModalVisible(true);
+      confirmLocationSharing();
     } catch (error) {
       console.error("Respond Error:", error);
       Toast.show({
@@ -329,6 +395,16 @@ export default function Rescuer() {
               <Text style={styles.liveText}>LIVE</Text>
             </View>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={locationBusy}
+            onPress={() => sharingLocation ? void disableLocationSharing() : confirmLocationSharing()}
+            style={[styles.queueSummary, isDark && darkStyles.darkCard, { marginTop: 10 }]}
+          >
+            <Text style={[styles.queueLabel, isDark && darkStyles.darkText]}>
+              {sharingLocation ? "Location sharing is on · Tap to stop" : "Share location during a response"}
+            </Text>
+          </Pressable>
           {reports.length > 0 ? (
             <RescuerCard
               recentReports={reports}
@@ -400,7 +476,7 @@ export default function Rescuer() {
               <View style={styles.modalButtonRow}>
                 <Pressable
                   onPress= {handleRespondToEmergency}
-                  style={styles.respondButton}
+                  style={[styles.respondButton, isDark && darkStyles.respondButton]}
                 >
                   <Text style={styles.respondButtonText}>Respond</Text>
                 </Pressable>
@@ -632,30 +708,14 @@ export default function Rescuer() {
 
                     {hasValidCoordinates(newReportData) ? (
                       <View style={styles.mapContainer}>
-                        <MapView
-                          style={styles.mapView}
-                          mapType={Platform.OS === "android" ? "none" : "standard"}
-                          initialRegion={{
+                        <LocationMap
+                          location={{
                             latitude: Number(newReportData.latitude),
                             longitude: Number(newReportData.longitude),
-                            latitudeDelta: 0.005,
-                            longitudeDelta: 0.005,
                           }}
-                        >
-                          <OSMTileLayer />
-                          <Marker
-                            coordinate={{
-                              latitude: Number(newReportData.latitude),
-                              longitude: Number(newReportData.longitude),
-                            }}
-                            pinColor="#be123c"
-                            title={newReportData.emergency_type}
-                            description={`Reported by ${newReportData.reporter_name || "Anonymous"}`}
-                          />
-                        </MapView>
-                        <Text pointerEvents="none" style={styles.mapAttribution}>
-                          {OSM_ATTRIBUTION}
-                        </Text>
+                          title={newReportData.emergency_type}
+                          description={`Reported by ${newReportData.reporter_name || "Anonymous"}`}
+                        />
                       </View>
                     ) : (
                       <Text
@@ -680,6 +740,7 @@ export default function Rescuer() {
                   onPress={handleRespondToEmergency}
                   style={[
                     styles.detailsRespondButton,
+                    isDark && darkStyles.respondButton,
                     isResponding && styles.disabledRespondButton,
                   ]}
                 >
@@ -700,6 +761,7 @@ export default function Rescuer() {
                   onPress={handleRequestBackup}
                   style={[
                     styles.backupButton,
+                    isDark && darkStyles.backupButton,
                     isRequestingBackup && styles.disabledRespondButton,
                   ]}
                 >
@@ -733,6 +795,8 @@ const darkStyles = StyleSheet.create({
   darkSecondaryText: { color: "#cbd5e1" },
   darkCard: { backgroundColor: "#1e293b" },
   darkRedText: { color: "#fda4af" },
+  respondButton: { backgroundColor: "#16a34a" },
+  backupButton: { backgroundColor: "#d97706" },
 });
 
 const styles = StyleSheet.create({
@@ -742,7 +806,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: "#d97706",
+    backgroundColor: "#92400e",
   },
   backupSentText: {
     marginTop: 10,
@@ -919,7 +983,7 @@ const styles = StyleSheet.create({
   },
 respondButton: {
     flex: 1,
-    backgroundColor: "#16a34a",
+    backgroundColor: "#15803d",
     paddingVertical: 12,
     borderRadius: 12,
     flexDirection: "row",
@@ -1012,22 +1076,6 @@ respondButton: {
     borderColor: "#e5e7eb",
     position: "relative",
   },
-  mapView: {
-    width: "100%",
-    height: "100%",
-  },
-  mapAttribution: {
-    position: "absolute",
-    right: 6,
-    bottom: 6,
-    overflow: "hidden",
-    borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    color: "#374151",
-    fontSize: 10,
-  },
   unavailableBox: {
     fontSize: 16,
     color: "#111827",
@@ -1046,7 +1094,7 @@ respondButton: {
     marginTop: 12,
   },
   detailsRespondButton: {
-    backgroundColor: "#16a34a",
+    backgroundColor: "#15803d",
     width: "100%",
     paddingVertical: 16,
     borderRadius: 12,

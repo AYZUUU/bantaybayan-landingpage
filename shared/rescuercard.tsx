@@ -53,7 +53,7 @@ export default function RescuerCard({
               <Text style={[styles.emergencyTitle, isDark && styles.darkText]}>
                 {report.emergency_type || "Unknown Emergency"}
               </Text>
-              <Text style={styles.severityText}>
+              <Text style={[styles.severityText, isDark && styles.darkSeverityText]}>
                 Severity: {report.accident_level || "Unspecified"}
               </Text>
             </View>
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   severityText: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#ea580c",
+    color: "#9a3412",
     marginTop: 4,
   },
   cardBody: {
@@ -219,6 +219,9 @@ const styles = StyleSheet.create({
   },
   darkSecondaryText: {
     color: "#cbd5e1",
+  },
+  darkSeverityText: {
+    color: "#ea580c",
   },
   darkCard: {
     backgroundColor: "#1e293b",

@@ -28,6 +28,12 @@ export interface ActiveResponder {
   contact_number: string;
 }
 
+export interface ResponderLiveLocation {
+  latitude: number;
+  longitude: number;
+  updatedAt: string;
+}
+
 function notifyReportEvent(
   event: "report_assigned" | "report_resolved",
   reportId: number,
@@ -105,6 +111,38 @@ export async function getActiveResponders(): Promise<ActiveResponder[]> {
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Supabase returned no responder data.");
   return data as ActiveResponder[];
+}
+
+export async function getAdminResponderLiveLocation(
+  reportId: number,
+): Promise<ResponderLiveLocation | null> {
+  const { data, error } = await supabase.rpc("get_responder_live_location", {
+    p_report_id: reportId,
+  });
+  if (error) throw new Error(`Could not load rescuer location: ${error.message}`);
+  if (!Array.isArray(data)) {
+    throw new Error("The server returned an invalid rescuer location.");
+  }
+  if (data.length === 0) return null;
+
+  const location: unknown = data[0];
+  if (
+    typeof location !== "object" ||
+    location === null ||
+    !("latitude" in location) ||
+    typeof location.latitude !== "number" ||
+    !("longitude" in location) ||
+    typeof location.longitude !== "number" ||
+    !("updated_at" in location) ||
+    typeof location.updated_at !== "string"
+  ) {
+    throw new Error("The server returned an invalid rescuer location.");
+  }
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    updatedAt: location.updated_at,
+  };
 }
 
 export async function updateAdminReport(

@@ -1,4 +1,5 @@
 import "./global.css";
+import "../services/responderLocation";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { LogBox, StyleSheet, View } from "react-native";
 import { useEffect } from "react";

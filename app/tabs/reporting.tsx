@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,7 @@ import {
 } from "../../services/reports";
 import { pickSource as pickPhotoFromCamera } from "../../shared/imagecapture";
 import LocationPopup from "../../shared/Popup";
+import RescuerLocation from "../../shared/RescuerLocation";
 import WarningPulse from "../../shared/warningpulse";
 import { useAuth } from "../../shared/auth";
 import { getCitizenReportNumber } from "../../shared/reportNumber";
@@ -63,6 +65,8 @@ export default function Reporting() {
 
   const [popupVisible, setPopupVisible] = useState(false);
   const [isMapVisible, setIsMapVisible] = useState(false);
+  const [isRescuerMapVisible, setIsRescuerMapVisible] = useState(false);
+  const [activeReportId, setActiveReportId] = useState<number | null>(null);
   const [activeReportNumber, setActiveReportNumber] = useState<number | null>(
     null,
   );
@@ -109,6 +113,8 @@ export default function Reporting() {
 
       if (!activeId) {
         trackedReportIdRef.current = null;
+        setActiveReportId(null);
+        setIsRescuerMapVisible(false);
         const resolvedStatus = await AsyncStorage.getItem(
           RESOLVED_REPORT_STATUS_KEY
         );
@@ -148,6 +154,8 @@ export default function Reporting() {
       // Reset previous values when tracking a different report.
       if (trackedReportIdRef.current !== activeId) {
         trackedReportIdRef.current = activeId;
+        setActiveReportId(null);
+        setIsRescuerMapVisible(false);
         const storedNumber = await AsyncStorage.getItem(
           "last_active_report_number",
         );
@@ -178,6 +186,12 @@ export default function Reporting() {
       }
 
       const report = await getReportStatus(activeId);
+      if (
+        trackedReportIdRef.current !== activeId ||
+        (await AsyncStorage.getItem("last_active_report_id")) !== activeId
+      ) {
+        return;
+      }
       const currentStatus = String(report.status ?? "").trim();
       const responderName = report.assigned_responder_name?.trim() || null;
       const responderStation =
@@ -192,9 +206,11 @@ export default function Reporting() {
         responderName,
         responderStation,
       });
+      setActiveReportId(normalizedStatus.includes("resolved") ? null : report.id);
 
       // Stop tracking once the report is resolved.
       if (normalizedStatus.includes("resolved")) {
+        setIsRescuerMapVisible(false);
         await AsyncStorage.setItem(
           RESOLVED_REPORT_STATUS_KEY,
           JSON.stringify({
@@ -212,6 +228,8 @@ export default function Reporting() {
         try {
           if (await clearUnavailableReportTracking(activeId)) {
             trackedReportIdRef.current = null;
+            setActiveReportId(null);
+            setIsRescuerMapVisible(false);
             setActiveReportNumber(null);
             updateActiveReportStatus(null);
           }
@@ -294,10 +312,10 @@ export default function Reporting() {
 
   const [selectedType, setSelectedType] = useState("Medical");
   const severityLevels = [
-    { id: "Low", color: "#16a34a" },
-    { id: "Medium", color: "#d97706" },
-    { id: "High", color: "#ea580c" },
-    { id: "Critical", color: "#be123c" },
+    { id: "Low", color: "#16a34a", lightColor: "#15803d" },
+    { id: "Medium", color: "#d97706", lightColor: "#92400e" },
+    { id: "High", color: "#ea580c", lightColor: "#9a3412" },
+    { id: "Critical", color: "#be123c", lightColor: "#be123c" },
   ] as const;
   const [selectedLevel, setSelectedLevel] = useState<string>("Medium");
   const [smsFallback, setSmsFallback] = useState<SmsFallback | null>(null);
@@ -348,6 +366,8 @@ export default function Reporting() {
 
     setActiveReportStatus(null);
     setActiveReportNumber(null);
+    setActiveReportId(null);
+    setIsRescuerMapVisible(false);
 
     await AsyncStorage.setItem(`last_active_report_status:${id}`, "Pending");
     await AsyncStorage.removeItem(RESOLVED_REPORT_STATUS_KEY);
@@ -528,6 +548,37 @@ export default function Reporting() {
         buttonText="Confirm Location"
       />
 
+      <Modal
+        visible={isLoggedIn && isRescuerMapVisible && activeReportId !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsRescuerMapVisible(false)}
+      >
+        <View style={styles.rescuerMapOverlay}>
+          <View style={[styles.rescuerMapCard, isDark && darkStyles.rescuerMapCard]}>
+            <Text style={[styles.rescuerMapTitle, isDark && darkStyles.text]}>
+              Rescuer location
+            </Text>
+            {isLoggedIn && isRescuerMapVisible && activeReportId !== null && (
+              <RescuerLocation
+                key={activeReportId}
+                reportId={activeReportId}
+                enabled={isFocused}
+                isDark={isDark}
+              />
+            )}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsRescuerMapVisible(false)}
+            >
+              <View style={styles.rescuerMapClose}>
+                <Text style={styles.rescuerMapCloseText}>Close</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {/* REPORT SUBMISSION CONFIRMATION */}
       <LocationPopup
         visible={popupVisible}
@@ -616,10 +667,10 @@ export default function Reporting() {
             >
               {activeReportStatus.status.toLowerCase().includes("resolved")
                 ? "Report Resolved"
-                : activeReportStatus.status === "Rescuer En Route"
+                : activeReportStatus.status.toLowerCase() === "dispatched"
                   ? activeReportStatus.responderName
-                    ? `${activeReportStatus.responderName} is en route to your location`
-                    : "Rescuer En Route to Your Location"
+                    ? `${activeReportStatus.responderName} is on the way to your location`
+                    : "Rescuer Dispatched to Your Location"
                   : activeReportStatus.status}
             </Text>
 
@@ -642,6 +693,17 @@ export default function Reporting() {
               >
                 Station: {activeReportStatus.responderStation || "Not listed"}
               </Text>
+            )}
+            {isLoggedIn && activeReportId !== null && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="View rescuer location"
+                onPress={() => setIsRescuerMapVisible(true)}
+              >
+                <View style={styles.rescuerLocationButton}>
+                  <Text style={styles.rescuerLocationButtonText}>View rescuer location</Text>
+                </View>
+              </Pressable>
             )}
           </View>
         )}
@@ -707,6 +769,7 @@ export default function Reporting() {
               onPress={sendSmsFallback}
               style={({ pressed }) => [
                 styles.smsButton,
+                isDark && darkStyles.smsButton,
                 pressed && styles.quickAlertPressed,
               ]}
             >
@@ -848,8 +911,8 @@ export default function Reporting() {
                     styles.severityChip,
                     isDark && styles.severityChipDark,
                     isActive && {
-                      backgroundColor: level.color,
-                      borderColor: level.color,
+                      backgroundColor: isDark ? level.color : level.lightColor,
+                      borderColor: isDark ? level.color : level.lightColor,
                     },
                   ]}
                 >
@@ -870,7 +933,7 @@ export default function Reporting() {
 
         {/* PHOTO AND SUBMIT */}
         <View style={styles.bottomContainer}>
-          <View style={[styles.photoCard, isDark && darkStyles.card]}>
+          <View style={[styles.photoCard, isDark && darkStyles.photoCard]}>
             <View style={styles.photoHeading}>
               <View style={styles.photoHeadingText}>
                 <Text style={[styles.photoTitle, isDark && darkStyles.text]}>
@@ -960,25 +1023,15 @@ export default function Reporting() {
               accessibilityLabel={photo ? "Retake incident photo" : "Take incident photo"}
               onPress={() => pickPhotoFromCamera(setPhoto)}
               disabled={loading}
-              style={({ pressed }) => [
-                styles.photoAction,
-                isDark && darkStyles.photoAction,
-                pressed && styles.photoActionPressed,
-                loading && styles.disabledButton,
-              ]}
+              style={loading ? styles.disabledButton : undefined}
             >
-              <View style={styles.photoActionContent}>
+              <View style={[styles.photoAction, isDark && darkStyles.photoAction]}>
                 <Ionicons
                   name="camera-outline"
                   size={20}
-                  color={isDark ? "#bfdbfe" : "#1d4ed8"}
+                  color="#ffffff"
                 />
-                <Text
-                  style={[
-                    styles.photoActionText,
-                    isDark && darkStyles.photoActionText,
-                  ]}
-                >
+                <Text style={styles.photoActionText}>
                   {photo ? "Retake photo" : "Take incident photo"}
                 </Text>
               </View>
@@ -1026,28 +1079,42 @@ export default function Reporting() {
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: loading || !photo }}
+              accessibilityLabel="Send detailed report"
+              accessibilityHint={!photo ? "Attach a photo to enable report submission." : undefined}
+              accessibilityState={{ disabled: loading || !photo, busy: loading }}
               onPress={handleSubmit}
               disabled={loading || !photo}
-              style={({ pressed }) => [
-                styles.submitButton,
-                !photo && styles.submitButtonDisabled,
-                pressed && photo && styles.submitPressed,
-                loading && styles.disabledButton,
-              ]}
             >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <View style={styles.submitButtonContent}>
-                  <Ionicons
-                    name={photo ? "send" : "lock-closed"}
-                    size={18}
-                    color="#ffffff"
-                  />
-                  <Text style={styles.submitButtonText}>
-                    Send detailed report
-                  </Text>
+              {({ pressed }) => (
+                <View
+                  style={[
+                    styles.submitButton,
+                    photo && !isDark && styles.submitButtonLight,
+                    !photo && styles.submitButtonDisabled,
+                    !photo && isDark && darkStyles.submitButtonDisabled,
+                    pressed && photo && !loading && styles.submitPressed,
+                  ]}
+                >
+                  <View style={styles.submitButtonContent}>
+                    {loading ? (
+                      <ActivityIndicator color={!photo && !isDark ? "#1e3a8a" : "#ffffff"} />
+                    ) : (
+                      <Ionicons
+                        name={photo ? "send" : "lock-closed"}
+                        size={20}
+                        color={!photo && !isDark ? "#1e3a8a" : "#ffffff"}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        styles.submitButtonText,
+                        photo && !isDark && styles.submitButtonTextLight,
+                        !photo && !isDark && styles.submitButtonDisabledText,
+                      ]}
+                    >
+                      {loading ? "Sending report..." : "Send detailed report"}
+                    </Text>
+                  </View>
                 </View>
               )}
             </Pressable>
@@ -1094,6 +1161,35 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  rescuerLocationButton: {
+    alignSelf: "flex-start",
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#166534",
+  },
+  rescuerLocationButtonText: { color: "#ffffff", fontWeight: "700" },
+  rescuerMapOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  rescuerMapCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 20,
+  },
+  rescuerMapTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  rescuerMapClose: {
+    alignItems: "center",
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: "#166534",
+  },
+  rescuerMapCloseText: { color: "#ffffff", fontWeight: "700" },
   statusBannerHeader: {
     fontSize: 12,
     color: "#166534",
@@ -1229,7 +1325,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#ea580c",
+    backgroundColor: "#9a3412",
   },
   smsButtonText: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
   severityTitle: {
@@ -1319,8 +1415,8 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#ffffff",
+    borderColor: "#93c5fd",
+    backgroundColor: "#f0f7ff",
   },
   photoHeading: {
     flexDirection: "row",
@@ -1392,26 +1488,19 @@ const styles = StyleSheet.create({
   photoAction: {
     alignSelf: "stretch",
     minHeight: 50,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: "#eff6ff",
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  photoActionContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-  },
-  photoActionPressed: {
-    opacity: 0.75,
+    borderRadius: 12,
+    backgroundColor: "#1d4ed8",
+    borderWidth: 1,
+    borderColor: "#1e40af",
   },
   photoActionText: {
-    color: "#1d4ed8",
+    color: "#ffffff",
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "700",
@@ -1445,7 +1534,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   warningSubText: {
-    color: "#F54927",
+    color: "#9a3412",
     fontSize: 12,
     lineHeight: 17,
   },
@@ -1457,21 +1546,29 @@ const styles = StyleSheet.create({
   submitButton: {
     width: "100%",
     alignSelf: "stretch",
-    minHeight: 54,
+    minHeight: 64,
     paddingHorizontal: 18,
+    paddingVertical: 12,
     borderRadius: 14,
     backgroundColor: "#1d4ed8",
+    borderWidth: 2,
+    borderColor: "#1e40af",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#1e40af",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
   },
   submitActionPanel: {
     width: "100%",
-    padding: 12,
-    gap: 9,
+    padding: 16,
+    gap: 10,
     borderRadius: 18,
-    backgroundColor: "#eaf0f8",
+
     borderWidth: 1,
-    borderColor: "#d7e1ef",
+    borderColor: "#bfdbfe",
   },
   submitButtonContent: {
     flexDirection: "row",
@@ -1479,14 +1576,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
+  submitButtonLight: {
+    minHeight: 68,
+    backgroundColor: "#1e3a8a",
+    borderColor: "#172554",
+  },
   submitButtonDisabled: {
-    backgroundColor: "#94a3b8",
+    backgroundColor: "#dbeafe",
+    borderColor: "#2563eb",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonTextLight: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  submitButtonDisabledText: {
+    color: "#1e3a8a",
   },
   submitPressed: {
     backgroundColor: "#1e40af",
+    transform: [{ scale: 0.98 }],
   },
   submitHint: {
-    color: "#64748b",
+    color: "#475569",
     textAlign: "center",
     fontSize: 12,
     lineHeight: 17,
@@ -1495,13 +1608,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 17,
+    flexShrink: 1,
   },
 });
 
 const darkStyles = StyleSheet.create({
   background: { backgroundColor: "#0f172a" },
   card: { backgroundColor: "#1e293b", borderColor: "#334155" },
+  rescuerMapCard: { backgroundColor: "#1e293b" },
   text: { color: "#f8fafc" },
   secondaryText: { color: "#cbd5e1" },
   banner: { backgroundColor: "#14532d", borderColor: "#166534" },
@@ -1509,6 +1624,7 @@ const darkStyles = StyleSheet.create({
   bannerTitle: { color: "#f0fdf4" },
   quickReportCard: { backgroundColor: "#3b1222", borderColor: "#7f1d3b" },
   smsCard: { backgroundColor: "#431407", borderColor: "#9a3412" },
+  smsButton: { backgroundColor: "#ea580c" },
   locationCard: { backgroundColor: "#172d4a", borderColor: "#315b8e" },
   locationIcon: { backgroundColor: "#1e3a5f" },
   activeEmergencyButton: { backgroundColor: "#be123c", borderColor: "#be123c" },
@@ -1522,6 +1638,7 @@ const darkStyles = StyleSheet.create({
   warningTitle: { color: "#fecaca" },
   warningSubText: { color: "#fca5a5" },
   photoIcon: { backgroundColor: "#334155" },
+  photoCard: { backgroundColor: "#172d4a", borderColor: "#60a5fa" },
   photoStatusIcon: { backgroundColor: "#334155" },
   photoStatusComplete: { backgroundColor: "#14532d" },
   requiredMark: { color: "#fca5a5" },
@@ -1529,8 +1646,8 @@ const darkStyles = StyleSheet.create({
     backgroundColor: "#0f172a",
     borderColor: "#475569",
   },
-  photoAction: { backgroundColor: "#1e3a5f", borderColor: "#1d4ed8" },
-  photoActionText: { color: "#bfdbfe" },
+  photoAction: { backgroundColor: "#2563eb", borderColor: "#60a5fa" },
+  submitButtonDisabled: { backgroundColor: "#64748b", borderColor: "#94a3b8" },
   submitActionPanel: {
     backgroundColor: "#1e293b",
     borderColor: "#334155",

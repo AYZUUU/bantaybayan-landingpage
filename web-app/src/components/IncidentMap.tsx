@@ -59,14 +59,17 @@ const tileAttribution =
 function getMarkerStatus(status?: string) {
   const normalizedStatus = status?.trim().toLowerCase() || "";
   if (normalizedStatus.includes("resolved")) return "resolved";
-  if (normalizedStatus.includes("en route")) return "en-route";
-  if (normalizedStatus.includes("dispatched")) return "dispatched";
+  if (
+    normalizedStatus.includes("dispatched") ||
+    normalizedStatus.includes("en route")
+  ) {
+    return "dispatched";
+  }
   return "pending";
 }
 
 function getDisplayStatus(status?: string) {
   const markerStatus = getMarkerStatus(status);
-  if (markerStatus === "en-route") return "En route";
   return markerStatus.charAt(0).toUpperCase() + markerStatus.slice(1);
 }
 
@@ -82,7 +85,7 @@ function createIncidentIcon(status?: string, animationClass = "") {
   }
 
   const markerContent =
-    markerStatus === "dispatched" || markerStatus === "en-route"
+    markerStatus === "dispatched"
       ? '<path class="incident-map-pin-shape" d="M12 1C6.48 1 2 5.48 2 11c0 7.1 10 16 10 16s10-8.9 10-16C22 5.48 17.52 1 12 1Z"/><path class="incident-map-pin-vehicle" d="M7.2 9.2h.9l1-2.7h5.8l1 2.7h.9c1 0 1.8.8 1.8 1.8v3.7h-1.3v1.5h-1.8v-1.5h-7v1.5H6.7v-1.5H5.4V11c0-1 .8-1.8 1.8-1.8Zm3-.9-.7 1.9h5l-.7-1.9h-3.6ZM7.9 11a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8Zm8.2 0a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8Z"/>'
       : '<path class="incident-map-pin-shape" d="M12 1C6.48 1 2 5.48 2 11c0 7.1 10 16 10 16s10-8.9 10-16C22 5.48 17.52 1 12 1Z"/><circle cx="12" cy="11" r="3.5"/>';
 
