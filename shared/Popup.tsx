@@ -1,8 +1,7 @@
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import React from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { MapView, Marker } from "./MapComponents";
-import OSMTileLayer, { OSM_ATTRIBUTION } from "./OSMTileLayer";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import LocationMap from "./LocationMap";
 
 interface LocationPopupProps {
   visible: boolean;
@@ -65,40 +64,14 @@ export default function LocationPopup({
             </Text>
           )}
 
-          {showMap && location && (
+          {visible && showMap && location && (
             <View
               style={[
                 styles.mapContainer,
                 isDark && darkStyles.mapContainer,
               ]}
             >
-              <MapView
-                style={{ width: "100%", height: "100%" }}
-                mapType={Platform.OS === "android" ? "none" : "standard"}
-                initialRegion={{
-                  latitude: location.latitude,
-                  longitude: location.longitude,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
-                }}
-                scrollEnabled={isDraggable}
-                zoomEnabled={isDraggable}
-              >
-                <OSMTileLayer />
-                <Marker
-                  coordinate={location}
-                  pinColor="#be123c"
-                  draggable={isDraggable}
-                  onDragEnd={(e) => {
-                    if (onLocationChange) {
-                      onLocationChange(e.nativeEvent.coordinate);
-                    }
-                  }}
-                />
-              </MapView>
-              <Text pointerEvents="none" style={styles.mapAttribution}>
-                {OSM_ATTRIBUTION}
-              </Text>
+              <LocationMap location={location} draggable={isDraggable} interactive={isDraggable} onLocationChange={onLocationChange} />
             </View>
           )}
 
@@ -184,18 +157,6 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     marginBottom: 16,
     position: "relative",
-  },
-  mapAttribution: {
-    position: "absolute",
-    right: 6,
-    bottom: 22,
-    overflow: "hidden",
-    borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    color: "#374151",
-    fontSize: 10,
   },
   addressBox: {
     backgroundColor: "#F9FAFB",

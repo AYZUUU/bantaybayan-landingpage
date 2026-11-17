@@ -55,6 +55,30 @@ ignored), keep a backup of it and its password, and define these properties in
 with `prebuild --clean`). On Windows, CMake 3.22 can fail on the
 `react-native-worklets` native step with "build.ninja still dirty"; set
 `cmake.dir` in `android\local.properties` to a CMake 3.31+ install.
+The Expo build-properties configuration in `app.json` preserves the
+WorkManager database constructor needed by minified release builds.
+On Android, the location picker and responder map use OpenStreetMap tiles via
+Leaflet and do not require a Google Maps API key. Tiles need an internet
+connection; configure `EXPO_PUBLIC_OSM_TILE_URL` for the tile provider when
+needed, and comply with its usage and attribution requirements.
+
+### Responder location sharing
+
+Apply `202611100011_responder_live_location.sql` to Supabase before enabling
+responder tracking. An assigned responder must explicitly enable sharing and
+grant foreground and background location permissions. Their position is shared
+only with the report's citizen while the response is en route. New responses
+require another confirmation; the location is removed
+when the report is resolved, reassigned, or sharing stops successfully. If
+server cleanup fails, the last position expires after two minutes. Anonymous
+reports cannot view a responder.
+Android shows a persistent notification while sharing. Device power management,
+lost connectivity, revoked permissions, or terminating the app can interrupt
+updates; the map must not be relied on as a guaranteed live position.
+Rebuild the mobile app after changing location permissions; existing generated
+native projects must also include the Expo location plugin's permissions.
+Background location is not supported in Expo Go; use a development or release
+build to test it on a physical device.
 
 ### SMS fallback for citizens without internet
 
@@ -101,11 +125,12 @@ either client.
 
 Before release, verify that migrations
 `202611100001_initial_schema.sql` through
-`202611100006_anonymous_quick_reports.sql` have been applied to the production
+`202611100011_responder_live_location.sql` have been applied to the production
 Supabase project in order. Apply only migrations that are not already present;
 do not rerun migrations blindly. These migrations cover the initial schema,
 responder claims, avatar cleanup, query indexes, web push/email and admin AAL2,
-and anonymous Quick Reports.
+anonymous Quick Reports, responder backup requests, report contact-number
+backfill and insert hardening, hotline settings, and responder live location.
 Then deploy the Edge Functions from a linked Supabase project:
 
 ```powershell
@@ -115,6 +140,7 @@ supabase functions deploy register-user
 supabase functions deploy manage-users
 supabase functions deploy notify-report-event
 supabase functions deploy submit-quick-report
+supabase functions deploy receive-sms-report
 ```
 
 `register-user` is intentionally public so prospective users can submit a
@@ -147,6 +173,14 @@ supabase secrets set VAPID_PUBLIC_KEY=<public-key> VAPID_PRIVATE_KEY=<private-ke
 ```
 
 Rebuild/redeploy the web dashboard after setting `VITE_WEB_PUSH_PUBLIC_KEY`.
+New citizen and responder registrations send a background browser notification
+to active superadmins who enabled push notifications. Report and account
+approval alerts open the relevant report or account; if the alert cannot
+identify the record, the account review queue is shown instead. Notification
+sound depends on browser and operating-system
+notification settings. Deploy both `register-user` and `notify-report-event`
+when updating this workflow. Notification delivery errors are logged without
+undoing a successful registration.
 Mobile push uses Expo Push Service; configure the Android FCM credentials in
 the EAS project before expecting Android delivery. `EXPO_ACCESS_TOKEN` may be
 set as a Supabase secret to authenticate Expo push requests.

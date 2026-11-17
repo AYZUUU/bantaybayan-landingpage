@@ -14,7 +14,7 @@ export const pickSource = async (setPhoto: (uri: string) => void) => {
   }
 
   const result = await ImagePicker.launchCameraAsync({
-    allowsEditing: true,
+    allowsEditing: false,
     quality: 1,
   });
 
